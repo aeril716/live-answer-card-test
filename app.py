@@ -93,6 +93,9 @@ def _run_app():
     else:  # Live
         col_a, col_b = st.sidebar.columns(2)
         if col_a.button("Start"):
+            if getattr(mods["audio"], "USE_MOCK", False):
+                # replay the rehearsed mock call from the top on every Start
+                mods["audio"] = importlib.reload(mods["audio"])
             mods["trigger"].reset_call()
             st.session_state.running = True
         if col_b.button("Stop"):
