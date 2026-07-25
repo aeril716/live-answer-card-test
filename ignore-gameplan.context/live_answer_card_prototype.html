@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Live Answer Card — Support Screen</title>
+<style>
+  :root{
+    --bg:#0A1430;          /* deep navy screen */
+    --panel:#111E42;       /* card background */
+    --line:#243560;        /* hairlines */
+    --accent:#4DA3FF;      /* product / live accents */
+    --qgray:#B7BFCF;       /* question text — soft gray */
+    --dim:#8B96B0;         /* secondary text */
+    --faint:#5A6685;       /* faint text */
+    --paper:#F2F5FB;       /* primary text */
+    --amber:#FFC94D;       /* confidence */
+    --chipbg:rgba(255,255,255,0.10);   /* translucent chip fill */
+    --chipbg-hover:rgba(255,255,255,0.18);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    background:var(--bg);
+    color:var(--paper);
+    font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;
+    display:flex;flex-direction:column;
+    overflow:hidden;
+  }
+
+  /* ── top bar ── */
+  header{
+    display:flex;align-items:center;gap:14px;
+    padding:14px 26px;
+    border-bottom:1px solid var(--line);
+    flex:0 0 auto;
+  }
+  .prod{font-size:15px;font-weight:700;letter-spacing:.14em;color:var(--accent)}
+  .prod span{color:var(--dim);font-weight:400;letter-spacing:.02em;margin-left:10px}
+  .live{margin-left:auto;display:flex;align-items:center;gap:8px;
+    font-size:12px;font-weight:700;letter-spacing:.18em;color:var(--accent)}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--accent);animation:pulse 1.6s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+  @media (prefers-reduced-motion: reduce){.dot{animation:none}}
+
+  /* ── main ── */
+  main{flex:1 1 auto;display:flex;flex-direction:column;padding:26px 26px 0;min-height:0}
+
+  .qrow{flex:0 0 auto;display:flex;gap:16px;align-items:flex-start;min-height:64px}
+  .tag{
+    flex:0 0 auto;width:44px;height:44px;border-radius:10px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:22px;font-weight:800;
+  }
+  .tag.q{background:var(--line);color:var(--qgray)}
+  .tag.a{background:#FFFFFF;color:var(--bg)}
+  .qtext{font-size:clamp(20px,3.2vw,30px);font-weight:500;line-height:1.25;color:var(--qgray);padding-top:5px}
+  .qtext .who{display:block;font-size:12px;font-weight:700;letter-spacing:.18em;color:var(--faint);margin-bottom:6px}
+
+  .arow{flex:1 1 auto;display:flex;gap:16px;margin-top:22px;min-height:0}
+  .apanel{flex:1;min-width:0;display:flex;flex-direction:column}
+
+  /* keyword chips */
+  .chips{display:flex;flex-wrap:wrap;gap:14px}
+  .chip{
+    border:2.5px solid #FFFFFF;
+    background:var(--chipbg);
+    color:#FFFFFF;
+    border-radius:14px;
+    padding:16px 24px;
+    font-size:clamp(26px,4.6vw,44px);
+    font-weight:800;letter-spacing:.01em;
+    cursor:pointer;user-select:none;
+    box-shadow:0 4px 18px rgba(0,0,0,.35);
+    transition:background .12s,color .12s,transform .06s;
+  }
+  .chip:hover{background:var(--chipbg-hover)}
+  .chip:active{transform:scale(.97)}
+  .chip:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+  .chip.open{background:#FFFFFF;color:var(--bg)}
+  .chip small{display:block;font-size:13px;font-weight:600;letter-spacing:.08em;opacity:.75;margin-top:2px}
+
+  /* detail drawer */
+  .drawer{
+    margin-top:18px;
+    border-left:4px solid #FFFFFF;
+    background:var(--panel);
+    border-radius:0 12px 12px 0;
+    padding:18px 22px;
+    display:none;
+    max-height:34vh;overflow:auto;
+  }
+  .drawer.show{display:block}
+  .drawer h3{font-size:13px;font-weight:700;letter-spacing:.16em;color:var(--accent);margin-bottom:10px}
+  .drawer p{font-size:clamp(15px,2vw,19px);line-height:1.55;color:var(--paper)}
+  .drawer .src{margin-top:12px;font-size:13px;color:var(--dim)}
+  .drawer .src b{color:var(--accent);font-weight:700}
+  .hint{margin-top:12px;font-size:13px;color:var(--faint)}
+
+  /* empty state */
+  .empty{
+    flex:1;display:none;align-items:center;justify-content:center;flex-direction:column;gap:10px;
+    color:var(--faint);
+  }
+  .empty .big{font-size:clamp(22px,3.4vw,34px);font-weight:700;letter-spacing:.04em}
+  .empty .why{font-size:14px;letter-spacing:.12em;font-weight:600}
+  .state-empty .arow,.state-empty .qrow .tag.a{display:none}
+  .state-empty .empty{display:flex}
+
+  /* ── footer / status ── */
+  footer{
+    flex:0 0 auto;
+    display:flex;align-items:center;gap:22px;
+    padding:12px 26px;border-top:1px solid var(--line);
+    font-size:13px;color:var(--dim);
+  }
+  .conf b{color:var(--amber);font-weight:800}
+  .conf.low b{color:var(--faint)}
+  .ctrl{margin-left:auto;display:flex;gap:8px}
+  .ctrl button{
+    background:none;border:1px solid var(--line);border-radius:8px;
+    color:var(--dim);font-size:12px;font-weight:700;padding:7px 12px;cursor:pointer;
+    font-family:inherit;letter-spacing:.04em;
+  }
+  .ctrl button:hover{border-color:var(--accent);color:var(--accent)}
+  .ctrl button.on{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="prod">ACME CLOUD <span>sales support · call #418</span></div>
+  <div class="live"><span class="dot"></span>LISTENING</div>
+</header>
+
+<main id="stage">
+  <div class="qrow">
+    <div class="tag q">Q</div>
+    <div class="qtext"><span class="who">PROSPECT · 00:04:12</span><span id="qline"></span></div>
+  </div>
+
+  <div class="arow">
+    <div class="tag a">A</div>
+    <div class="apanel">
+      <div class="chips" id="chips"></div>
+      <div class="drawer" id="drawer">
+        <h3 id="d-title"></h3>
+        <p id="d-body"></p>
+        <div class="src" id="d-src"></div>
+      </div>
+      <div class="hint">Tap a keyword for the detail · the rep only ever reads the big words</div>
+    </div>
+  </div>
+
+  <div class="empty">
+    <div class="big">— nothing —</div>
+    <div class="why" id="whyline">NOT A TECHNICAL QUESTION · SCREEN STAYS QUIET</div>
+  </div>
+</main>
+
+<footer>
+  <div class="conf" id="conf"></div>
+  <div id="lat"></div>
+  <div class="ctrl" id="ctrl"></div>
+</footer>
+
+<script>
+const SCENES = [
+  {
+    label:"1 · SOC 2",
+    q:"Are you guys SOC 2 certified?",
+    fired:true, conf:0.91, lat:"1.8s",
+    chips:[
+      {big:"SOC 2 — YES", small:"renewed 2024",
+       title:"COMPLIANCE DETAIL",
+       body:"SOC 2 Type II, current. Renewed March 2024 after an external audit. Report available under NDA — legal can send it same-day.",
+       src:"Source: <b>security-overview.pdf · p.4</b>"},
+      {big:"TYPE II", small:"external audit",
+       title:"AUDIT SCOPE",
+       body:"Covers security, availability, and confidentiality. Audit window was a full 12 months, not a point-in-time snapshot.",
+       src:"Source: <b>security-overview.pdf · p.6</b>"},
+      {big:"NDA → REPORT", small:"same-day",
+       title:"HOW THEY GET IT",
+       body:"Prospect signs the standard NDA, then the full report goes out from legal within the day. No procurement review needed on our side.",
+       src:"Source: <b>sales-playbook.md · §3.2</b>"}
+    ]
+  },
+  {
+    label:"2 · Data residency",
+    q:"Where does our data actually live? We need EU-only.",
+    fired:true, conf:0.87, lat:"2.1s",
+    chips:[
+      {big:"EU — YES", small:"Frankfurt region",
+       title:"RESIDENCY DETAIL",
+       body:"EU customers are pinned to the Frankfurt region. Data does not leave the EU, including backups and failover.",
+       src:"Source: <b>data-residency.pdf · p.2</b>"},
+      {big:"NO US TRANSIT", small:"incl. backups",
+       title:"WHAT THAT COVERS",
+       body:"Processing, storage, backups, and support-access logs all stay in-region. US staff access requires customer-approved break-glass.",
+       src:"Source: <b>data-residency.pdf · p.5</b>"},
+      {big:"DPA READY", small:"standard terms",
+       title:"PAPERWORK",
+       body:"Standard DPA with SCCs pre-signed. Redlines go to legal; typical turnaround is two business days.",
+       src:"Source: <b>legal-faq.md · §1</b>"}
+    ]
+  },
+  {
+    label:"3 · Small talk",
+    q:"Haha yeah, the weather's been crazy over here too.",
+    fired:false, conf:0.12, lat:"0.4s",
+    why:"NOT A TECHNICAL QUESTION · SCREEN STAYS QUIET"
+  },
+  {
+    label:"4 · Low confidence",
+    q:"Does it integrate with our internal ticketing tool, Zentrix?",
+    fired:false, conf:0.34, lat:"1.2s",
+    why:"CONFIDENCE 0.34 — BELOW THRESHOLD · BETTER SILENT THAN WRONG"
+  }
+];
+
+const stage=document.getElementById('stage'),
+      qline=document.getElementById('qline'),
+      chipsEl=document.getElementById('chips'),
+      drawer=document.getElementById('drawer'),
+      dTitle=document.getElementById('d-title'),
+      dBody=document.getElementById('d-body'),
+      dSrc=document.getElementById('d-src'),
+      confEl=document.getElementById('conf'),
+      latEl=document.getElementById('lat'),
+      whyEl=document.getElementById('whyline'),
+      ctrl=document.getElementById('ctrl');
+
+let cur=0;
+
+function show(i){
+  cur=i;
+  const s=SCENES[i];
+  [...ctrl.children].forEach((b,j)=>b.classList.toggle('on',j===i));
+  qline.textContent='\u201C'+s.q+'\u201D';
+  drawer.classList.remove('show');
+  chipsEl.querySelectorAll('.chip').forEach(c=>c.remove());
+  confEl.innerHTML='confidence <b>'+s.conf.toFixed(2)+'</b>'+(s.fired?'':' — below threshold');
+  confEl.classList.toggle('low',!s.fired);
+  latEl.textContent='answer in '+s.lat;
+  if(s.fired){
+    stage.classList.remove('state-empty');
+    s.chips.forEach((c,ci)=>{
+      const el=document.createElement('button');
+      el.className='chip';
+      el.innerHTML=c.big+'<small>'+c.small+'</small>';
+      el.onclick=()=>openDetail(ci,el);
+      chipsEl.appendChild(el);
+    });
+  }else{
+    stage.classList.add('state-empty');
+    whyEl.textContent=s.why;
+  }
+}
+
+function openDetail(ci,el){
+  const c=SCENES[cur].chips[ci];
+  const already=el.classList.contains('open');
+  chipsEl.querySelectorAll('.chip').forEach(x=>x.classList.remove('open'));
+  if(already){drawer.classList.remove('show');return;}
+  el.classList.add('open');
+  dTitle.textContent=c.title;
+  dBody.textContent=c.body;
+  dSrc.innerHTML=c.src;
+  drawer.classList.add('show');
+}
+
+SCENES.forEach((s,i)=>{
+  const b=document.createElement('button');
+  b.textContent=s.label;
+  b.onclick=()=>show(i);
+  ctrl.appendChild(b);
+});
+document.addEventListener('keydown',e=>{
+  const n=parseInt(e.key,10);
+  if(n>=1&&n<=SCENES.length)show(n-1);
+});
+show(0);
+</script>
+</body>
+</html>

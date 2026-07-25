@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hackathon — Three Ideas, One Spine</title>
+<style>
+  :root{
+    --navy:#1A2A4A; --ink:#0E1830; --orange:#FF5A36; --orange-dk:#C43D18;
+    --card:#F1F4F9; --txt:#2A3550; --mute:#6E7C96; --faint:#9AA6BD;
+    --lightx:#C3CDE0; --dim:#8B96B0; --line:#243560; --white:#FFFFFF;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-snap-type:y mandatory;scroll-behavior:smooth}
+  body{
+    font-family:-apple-system,"Helvetica Neue",Helvetica,Arial,"Apple SD Gothic Neo",sans-serif;
+    color:var(--txt);background:var(--white);
+  }
+  section{
+    min-height:100vh;scroll-snap-align:start;
+    padding:5vh 5vw;display:flex;flex-direction:column;justify-content:center;
+    position:relative;
+  }
+  section.dark{background:var(--ink);color:var(--white)}
+
+  /* ---------- shared ---------- */
+  .eyebrow{font-size:clamp(13px,1.1vw,16px);font-weight:800;letter-spacing:.25em;color:var(--orange);margin-bottom:14px}
+  h1{font-size:clamp(44px,7vw,96px);font-weight:900;line-height:1.02;letter-spacing:-.01em}
+  h2{font-size:clamp(32px,3.6vw,52px);font-weight:900;letter-spacing:.01em;color:var(--navy)}
+  .dark h2{color:var(--white)}
+  .sub{font-size:clamp(16px,1.5vw,21px);color:var(--mute);margin-top:10px;max-width:70ch}
+  .dark .sub{color:var(--dim)}
+
+  .headrow{display:flex;align-items:center;gap:18px;margin-bottom:8px}
+  .num{
+    width:clamp(46px,3.6vw,60px);height:clamp(46px,3.6vw,60px);border-radius:50%;
+    background:var(--navy);color:var(--white);
+    display:flex;align-items:center;justify-content:center;
+    font-size:clamp(22px,1.8vw,28px);font-weight:900;flex:0 0 auto;
+  }
+  .num.hot{background:var(--orange)}
+  .pill{
+    margin-left:auto;background:var(--orange);color:var(--white);
+    font-size:clamp(12px,1vw,15px);font-weight:800;letter-spacing:.14em;
+    padding:.55em 1.3em;border-radius:99px;white-space:nowrap;
+  }
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:clamp(14px,1.6vw,24px);margin-top:clamp(18px,2.4vh,30px)}
+  .card{background:var(--card);border-radius:14px;padding:clamp(18px,2vw,28px)}
+  .card .label{font-size:clamp(13px,1.05vw,16px);font-weight:800;letter-spacing:.16em;color:var(--navy);margin-bottom:14px}
+  .card .label.hot{color:var(--orange)}
+  .card ul{list-style:none}
+  .card li{
+    display:flex;gap:.6em;align-items:baseline;
+    font-size:clamp(17px,1.55vw,23px);font-weight:600;line-height:1.35;
+    padding:.34em 0;
+  }
+  .card li::before{content:"";flex:0 0 .42em;width:.42em;height:.42em;background:var(--navy);display:inline-block;transform:translateY(-.08em)}
+  .card.hotmark li::before{background:var(--orange)}
+
+  .strip{display:flex;gap:clamp(14px,1.6vw,24px);align-items:stretch;margin-top:clamp(14px,2vh,22px);flex-wrap:wrap}
+  .stat{display:flex;align-items:center;gap:12px}
+  .stat b{font-size:clamp(34px,3.4vw,52px);font-weight:900}
+  .stat span{font-size:clamp(13px,1.1vw,16px);color:var(--mute);max-width:16ch;line-height:1.3}
+  .callout{
+    background:#FFEBE5;color:var(--orange-dk);border-radius:12px;
+    padding:.9em 1.2em;font-weight:800;font-size:clamp(15px,1.3vw,19px);
+    display:flex;align-items:center;flex:1;min-width:260px;
+  }
+  .banner{
+    background:var(--card);color:var(--navy);border-radius:12px;
+    padding:.9em 1.2em;font-weight:800;font-size:clamp(15px,1.35vw,20px);
+    margin-top:clamp(14px,2vh,22px);
+  }
+  .chip{
+    background:var(--navy);color:var(--white);border-radius:99px;
+    padding:.5em 1.4em;font-weight:800;font-size:clamp(14px,1.2vw,18px);
+  }
+
+  /* ---------- title ---------- */
+  #s1 .lineup{display:flex;gap:6vw;margin-top:7vh;flex-wrap:wrap}
+  #s1 .lineup .it b{display:block;font-size:clamp(30px,3vw,44px);font-weight:900;color:#566584}
+  #s1 .lineup .it span{font-size:clamp(15px,1.3vw,19px);color:var(--dim)}
+  #s1 .lineup .it.hot b{color:var(--orange)}
+  #s1 .lineup .it.hot span{color:var(--white);font-weight:700}
+
+  /* ---------- scene ---------- */
+  .scenewrap{margin-top:clamp(16px,2.4vh,26px);display:flex;justify-content:center}
+  .scenewrap svg{width:min(100%,980px);height:auto;border-radius:18px;box-shadow:0 16px 44px rgba(26,42,74,.16)}
+
+  /* ---------- prototype mock ---------- */
+  .mockwrap{display:grid;grid-template-columns:1.15fr .85fr;gap:clamp(18px,2vw,30px);margin-top:clamp(18px,2.5vh,28px);align-items:start}
+  .mock{
+    background:#0A1430;border-radius:16px;overflow:hidden;
+    box-shadow:0 18px 50px rgba(10,20,48,.35);
+  }
+  .mock .bar{display:flex;align-items:center;gap:8px;padding:12px 18px;border-bottom:1px solid var(--line)}
+  .mock .bar i{width:11px;height:11px;border-radius:50%;background:#3E4D6C}
+  .mock .bar .lst{margin-left:auto;color:#4DA3FF;font-size:12px;font-weight:800;letter-spacing:.18em;display:flex;align-items:center;gap:7px}
+  .mock .bar .lst::before{content:"";width:8px;height:8px;border-radius:50%;background:#4DA3FF}
+  .mock .body{padding:clamp(16px,1.8vw,26px)}
+  .mock .q{color:#9AA6BD;font-size:clamp(15px,1.3vw,19px);margin-bottom:16px}
+  .mock .chips{display:flex;gap:12px;flex-wrap:wrap}
+  .mock .kchip{
+    border:2.5px solid var(--white);border-radius:12px;
+    background:rgba(255,255,255,.1);color:var(--white);
+    font-size:clamp(20px,2vw,30px);font-weight:900;
+    padding:.45em .8em;
+  }
+  .mock .kchip.open{background:var(--white);color:#0A1430}
+  .mock .det{border-left:4px solid var(--white);background:#111E42;border-radius:0 10px 10px 0;padding:14px 18px;margin-top:16px}
+  .mock .det h4{color:#4DA3FF;font-size:12px;letter-spacing:.16em;margin-bottom:8px}
+  .mock .det p{color:#F2F5FB;font-size:clamp(14px,1.2vw,17px);line-height:1.5}
+  .mock .det .src{color:#8B96B0;font-size:12.5px;margin-top:8px}
+  .mock .det .src b{color:#4DA3FF}
+  .mock .cf{padding:10px 18px;border-top:1px solid var(--line);color:#8B96B0;font-size:12.5px}
+  .mock .cf b{color:#FFC94D}
+  .emptybox{
+    border:2px dashed #C7D0E0;border-radius:14px;background:var(--card);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+    padding:clamp(20px,3vh,34px);margin-top:clamp(14px,2vh,20px);
+  }
+  .emptybox b{font-size:clamp(20px,1.9vw,28px);color:var(--faint);font-weight:800}
+  .emptybox span{font-size:clamp(12px,1vw,14px);letter-spacing:.12em;font-weight:700;color:var(--faint)}
+
+  /* ---------- shared slide (stack) ---------- */
+  .stack{margin-top:clamp(16px,2.4vh,26px);display:grid;grid-template-columns:1fr 1fr;gap:clamp(18px,2vw,30px)}
+  .rowline{display:flex;align-items:baseline;gap:14px;padding:.55em 0;border-bottom:1px solid var(--line)}
+  .rowline b{font-size:clamp(18px,1.6vw,24px);color:var(--white);min-width:9ch}
+  .rowline span{color:var(--dim);font-size:clamp(13px,1.15vw,16px);flex:1}
+  .tagm{font-size:11.5px;font-weight:800;letter-spacing:.08em;border-radius:99px;padding:.35em .9em;flex:0 0 auto}
+  .tagm.must{background:var(--orange);color:var(--white)}
+  .tagm.opt{border:1px solid #3E4D6C;color:var(--dim)}
+  .darkcard{background:#18243F;border-radius:12px;padding:clamp(16px,1.8vw,24px)}
+  .darkcard li::before{background:var(--orange)}
+  .darkcard li{color:var(--lightx);font-size:clamp(15px,1.35vw,19px)}
+  .risk{display:flex;gap:12px;align-items:baseline;padding:.42em 0}
+  .risk b{color:var(--white);font-size:clamp(15px,1.35vw,19px);min-width:13ch}
+  .risk span{color:var(--dim);font-size:clamp(13px,1.2vw,16px)}
+  .risk span::before{content:"→ ";color:var(--orange);font-weight:800}
+  .sechead{font-size:clamp(13px,1.05vw,16px);font-weight:800;letter-spacing:.2em;color:var(--orange);margin:1.6em 0 .5em}
+  .sechead:first-child{margin-top:0}
+
+  /* ---------- decision ---------- */
+  .leadbox{
+    background:var(--ink);border-radius:16px;color:var(--white);
+    display:flex;align-items:center;gap:4vw;flex-wrap:wrap;
+    padding:clamp(20px,2.6vw,34px);margin-top:clamp(16px,2.2vh,24px);
+  }
+  .leadbox .l .k{font-size:clamp(12px,1vw,15px);font-weight:800;letter-spacing:.2em;color:var(--orange)}
+  .leadbox .l b{display:block;font-size:clamp(30px,3.4vw,50px);font-weight:900;margin-top:4px}
+  .leadbox .r{flex:1;min-width:280px;color:var(--lightx);font-size:clamp(14px,1.3vw,18px);line-height:1.55}
+  .why3{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(14px,1.6vw,24px);margin-top:clamp(16px,2.2vh,24px)}
+  .why3 .card b{display:block;color:var(--orange);font-size:clamp(17px,1.55vw,23px);font-weight:900;margin-bottom:8px}
+  .why3 .card p{font-size:clamp(14px,1.25vw,17px);color:var(--txt);line-height:1.5}
+  .fraud{
+    background:#FFEBE5;border-radius:14px;padding:clamp(16px,2vw,26px);margin-top:clamp(16px,2.2vh,24px);
+  }
+  .fraud .k{font-size:clamp(12px,1vw,15px);font-weight:800;letter-spacing:.2em;color:var(--orange-dk)}
+  .fraud p{margin-top:8px;color:#6B2A14;font-size:clamp(14px,1.3vw,18px);line-height:1.55;font-weight:600}
+
+  /* ---------- roles ---------- */
+  .roles .card{display:flex;flex-direction:column}
+  .roles .done{margin-top:auto;padding-top:14px;font-size:clamp(13px,1.1vw,16px);font-weight:800;color:var(--orange)}
+
+  /* ---------- timeline ---------- */
+  .tl{margin-top:clamp(18px,2.6vh,30px)}
+  .tl .axis{display:grid;grid-template-columns:150px repeat(12,1fr);gap:0 0;align-items:center}
+  .tl .hlabel{grid-row:1;text-align:center;font-size:clamp(11px,1vw,14px);font-weight:800;color:var(--mute);padding-bottom:8px}
+  .tl .lane-name{font-size:clamp(13px,1.15vw,17px);font-weight:800;color:var(--navy);padding-right:12px}
+  .tl .bar{
+    height:clamp(34px,4.4vh,46px);border-radius:9px;display:flex;align-items:center;
+    color:var(--white);font-size:clamp(11px,1.05vw,15px);font-weight:800;
+    padding:0 12px;margin:4px 3px;white-space:nowrap;overflow:hidden;
+  }
+  .b-nv{background:var(--navy)} .b-nv2{background:#44557A} .b-or{background:var(--orange)}
+  .tl .ms{
+    display:flex;justify-content:space-between;margin-top:10px;padding-left:150px;
+  }
+  .tl .ms i{font-style:normal;font-size:clamp(12px,1.1vw,15px);font-weight:800;color:var(--orange-dk)}
+  .rules{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(14px,1.6vw,22px);margin-top:clamp(16px,2.4vh,26px)}
+  .rules .card b{display:block;color:var(--orange);letter-spacing:.14em;font-size:clamp(12px,1vw,14px);margin-bottom:6px}
+  .rules .card p{font-weight:800;color:var(--navy);font-size:clamp(15px,1.35vw,19px)}
+
+  /* ---------- nav ---------- */
+  .navdots{
+    position:fixed;right:18px;top:50%;transform:translateY(-50%);
+    display:flex;flex-direction:column;gap:10px;z-index:9;
+  }
+  .navdots a{width:10px;height:10px;border-radius:50%;background:#C7D0E0;display:block}
+  .navdots a.on{background:var(--orange)}
+  .pageno{position:absolute;bottom:22px;right:5vw;font-size:13px;font-weight:800;color:var(--faint);letter-spacing:.1em}
+  .dark .pageno{color:#3E4D6C}
+
+  @media (max-width:860px){
+    .grid2,.stack,.why3,.rules,.mockwrap{grid-template-columns:1fr}
+    .tl .axis{grid-template-columns:90px repeat(12,1fr)}
+    .tl .ms{padding-left:90px}
+    .navdots{display:none}
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══ 1 · TITLE ═══ -->
+<section class="dark" id="s1">
+  <div class="eyebrow">12-HOUR HACKATHON</div>
+  <h1>THREE IDEAS.<br>ONE SPINE.</h1>
+  <p class="sub" style="margin-top:22px;font-size:clamp(17px,1.6vw,23px)">
+    Voice is essential, not decoration — and the answer is worthless if it's slow.<br>
+    That's why <b style="color:var(--white)">Cerebras + ElevenLabs</b> anchor all three builds.
+  </p>
+  <div class="lineup">
+    <div class="it hot"><b>01</b><span>Live Answer Card</span></div>
+    <div class="it"><b>02</b><span>Ask in Your Language</span></div>
+    <div class="it"><b>03</b><span>Senior Doc Assistant</span></div>
+  </div>
+  <div class="pageno"></div>
+</section>
+<!-- ═══ 2 · IDEA 1 ═══ -->
+<section id="s2">
+  <div class="headrow">
+    <div class="num hot">1</div>
+    <h2>LIVE ANSWER CARD</h2>
+    <div class="pill">LEAD PICK</div>
+  </div>
+  <p class="sub">A prospect asks a technical question. Before the rep can stall, the answer is on a teammate's screen.</p>
+  <div class="strip">
+    <div class="stat"><b style="color:var(--orange)">2s</b><span>Rep speaks it. The call never stalls.</span></div>
+    <div class="stat"><b style="color:var(--navy)">6s</b><span>Rep already said "let me check."</span></div>
+    <div class="callout">Slow isn't "worse" here — slow means the thing doesn't exist.</div>
+  </div>
+  <div class="grid2">
+    <div class="card hotmark"><div class="label hot">GOAL</div><ul>
+      <li>Answer lands before the rep stalls</li>
+      <li>Keep the call's momentum alive</li>
+      <li>Never guess — silence over errors</li>
+    </ul></div>
+    <div class="card"><div class="label">TOOLS</div><ul>
+      <li>Cerebras — real-time classify + generate</li>
+      <li>ElevenLabs — live transcription, both sides</li>
+      <li>RAG over our product docs</li>
+    </ul></div>
+    <div class="card"><div class="label">FINISHED PRODUCT</div><ul>
+      <li>Live keyword card on a second screen</li>
+      <li>Tap a keyword → the source detail</li>
+      <li>Stays empty on small talk / low confidence</li>
+    </ul></div>
+    <div class="card"><div class="label">LIMITS &amp; RISKS</div><ul>
+      <li>The trigger classifier is the real work</li>
+      <li>Needs 2 screens + a rehearsed role-play</li>
+      <li>Venue noise degrades transcription</li>
+    </ul></div>
+  </div>
+  <div class="pageno"></div>
+</section>
+<!-- ═══ X · THE ROOM ═══ -->
+<section id="sroom">
+  <h2>THE ROOM</h2>
+  <p class="sub">One rep talks. One teammate glances at the card. The prospects never know it's there.</p>
+  <div class="scenewrap">
+    <svg viewBox="0 0 1000 560" role="img" aria-label="Sales call: two prospects across the table, two reps seen from behind, a laptop showing the keyword card">
+      <!-- room -->
+      <rect x="0" y="0" width="1000" height="560" rx="18" fill="#EDF1F8"/>
+      <rect x="0" y="330" width="1000" height="230" fill="#E2E8F3"/>
+      <!-- window -->
+      <rect x="80" y="48" width="270" height="150" rx="10" fill="#D6DFEF"/>
+      <rect x="95" y="62" width="115" height="122" rx="6" fill="#C4D2E8"/>
+      <rect x="220" y="62" width="115" height="122" rx="6" fill="#C4D2E8"/>
+      <!-- far side: two prospects facing us -->
+      <g>
+        <circle cx="380" cy="205" r="46" fill="#8B96B0"/>
+        <path d="M310 330 q70 -85 140 0 z" fill="#8B96B0"/>
+        <circle cx="620" cy="205" r="46" fill="#6E7C96"/>
+        <path d="M550 330 q70 -85 140 0 z" fill="#6E7C96"/>
+      </g>
+      <!-- table -->
+      <ellipse cx="500" cy="392" rx="440" ry="88" fill="#FFFFFF"/>
+      <ellipse cx="500" cy="386" rx="440" ry="84" fill="#F7F9FD"/>
+      <!-- coffee cups -->
+      <ellipse cx="360" cy="368" rx="17" ry="9" fill="#D6DFEF"/>
+      <ellipse cx="640" cy="368" rx="17" ry="9" fill="#D6DFEF"/>
+      <!-- laptop on near side, screen cheated toward viewer -->
+      <g>
+        <rect x="565" y="332" width="250" height="150" rx="10" fill="#0A1430"/>
+        <rect x="573" y="340" width="234" height="134" rx="6" fill="#101B3B"/>
+        <!-- mini UI -->
+        <circle cx="590" cy="354" r="4" fill="#FF5A36"/>
+        <text x="600" y="358" font-family="Arial, sans-serif" font-size="11" font-weight="800" fill="#FF5A36" letter-spacing="2">LISTENING</text>
+        <text x="586" y="380" font-family="Arial, sans-serif" font-size="12" fill="#9AA6BD">“Are you SOC 2 certified?”</text>
+        <rect x="586" y="392" width="128" height="34" rx="8" fill="rgba(255,255,255,0.12)" stroke="#FFFFFF" stroke-width="2.5"/>
+        <text x="650" y="415" font-family="Arial, sans-serif" font-size="16" font-weight="900" fill="#FFFFFF" text-anchor="middle">SOC 2 — YES</text>
+        <rect x="722" y="392" width="72" height="34" rx="8" fill="rgba(255,255,255,0.12)" stroke="#FFFFFF" stroke-width="2.5"/>
+        <text x="758" y="415" font-family="Arial, sans-serif" font-size="15" font-weight="900" fill="#FFFFFF" text-anchor="middle">TYPE II</text>
+        <text x="586" y="452" font-family="Arial, sans-serif" font-size="11" fill="#8B96B0">confidence <tspan fill="#FFC94D" font-weight="800">0.91</tspan> · 1.8s</text>
+        <!-- keyboard base -->
+        <path d="M552 482 h276 l16 22 h-308 z" fill="#1A2A4A"/>
+      </g>
+      <!-- near side: two backs -->
+      <g>
+        <circle cx="285" cy="470" r="62" fill="#1A2A4A"/>
+        <path d="M180 560 q105 -110 210 0 z" fill="#1A2A4A"/>
+        <circle cx="700" cy="482" r="62" fill="#243560"/>
+        <path d="M595 560 q105 -110 210 0 z" fill="#243560"/>
+      </g>
+      <!-- speech: prospect asks -->
+      <g>
+        <rect x="300" y="96" width="228" height="46" rx="23" fill="#FFFFFF"/>
+        <path d="M368 142 l-12 20 l30 -20 z" fill="#FFFFFF"/>
+        <text x="414" y="125" font-family="Arial, sans-serif" font-size="17" font-weight="800" fill="#1A2A4A" text-anchor="middle">“Are you SOC 2 certified?”</text>
+      </g>
+      <!-- speech: rep answers instantly -->
+      <g>
+        <rect x="96" y="380" width="180" height="44" rx="22" fill="#FF5A36"/>
+        <path d="M232 424 l16 18 l6 -22 z" fill="#FF5A36"/>
+        <text x="186" y="408" font-family="Arial, sans-serif" font-size="17" font-weight="900" fill="#FFFFFF" text-anchor="middle">“Yes — Type II.”</text>
+      </g>
+      <!-- labels -->
+      <text x="500" y="270" font-family="Arial, sans-serif" font-size="13" font-weight="800" fill="#6E7C96" letter-spacing="3" text-anchor="middle">PROSPECTS</text>
+      <text x="285" y="548" font-family="Arial, sans-serif" font-size="13" font-weight="800" fill="#C3CDE0" letter-spacing="3" text-anchor="middle">REP</text>
+      <text x="700" y="548" font-family="Arial, sans-serif" font-size="13" font-weight="800" fill="#C3CDE0" letter-spacing="3" text-anchor="middle">SUPPORT</text>
+    </svg>
+  </div>
+  <div class="pageno"></div>
+</section>
+<!-- ═══ 3 · PROTOTYPE ═══ -->
+<section id="s3">
+  <h2>PROTOTYPE — THE SUPPORT SCREEN</h2>
+  <p class="sub">The teammate's laptop. Three words, no scrolling, no paragraph to relay.</p>
+  <div class="mockwrap">
+    <div class="mock">
+      <div class="bar"><i></i><i></i><i></i><div class="lst">LISTENING</div></div>
+      <div class="body">
+        <div class="q">“Are you guys SOC 2 certified?”</div>
+        <div class="chips">
+          <div class="kchip open">SOC 2 — YES</div>
+          <div class="kchip">TYPE II</div>
+          <div class="kchip">NDA → REPORT</div>
+        </div>
+        <div class="det">
+          <h4>COMPLIANCE DETAIL</h4>
+          <p>SOC 2 Type II, current. Renewed March 2024 after an external audit. Report goes out under NDA, same-day.</p>
+          <div class="src">Source: <b>security-overview.pdf · p.4</b></div>
+        </div>
+      </div>
+      <div class="cf">confidence <b>0.91</b> · answer in 1.8s</div>
+    </div>
+    <div>
+      <div class="card hotmark"><div class="label hot">WHAT MAKES IT WORK</div><ul>
+        <li>Three words, not a paragraph</li>
+        <li>Scanned in a glance, never read aloud</li>
+        <li>Detail only if the prospect digs</li>
+      </ul></div>
+      <div class="emptybox">
+        <b>— nothing —</b>
+        <span>SMALL TALK · PRICING · LOW CONFIDENCE</span>
+      </div>
+      <p style="margin-top:14px;font-weight:800;color:var(--navy);font-size:clamp(15px,1.35vw,19px)">
+        The empty screen is part of the demo. That restraint is the decision layer.
+      </p>
+    </div>
+  </div>
+  <div class="pageno"></div>
+</section>
+<!-- ═══ 7 · DECISION ═══ -->
+<section id="s7">
+  <h2>WHAT WE'RE DOING</h2>
+  <div class="leadbox">
+    <div class="l">
+      <div class="k">LEAD WITH</div>
+      <b>LIVE ANSWER CARD</b>
+    </div>
+    <div class="r">
+      Sharpest "slow = worthless" pressure. Splits into parallel tasks. Demos in 3 minutes.<br>
+      The other two share the same stack — keep them warm.
+    </div>
+  </div>
+  <div class="why3">
+    <div class="card"><b>The constraint is real</b><p>3 seconds isn't a nice-to-have. It decides whether the thing works at all.</p></div>
+    <div class="card"><b>Four lanes, no blocking</b><p>Retrieval, audio, trigger, screen — all independent until H+4.</p></div>
+    <div class="card"><b>Demos in 3 minutes</b><p>No setup story needed. Everyone has sat through that dead moment.</p></div>
+  </div>
+  <div class="fraud">
+    <div class="k">IF WE KEEP FRAUDLENS</div>
+    <p>Trim it — don't restart. The core (ingestion → enrichment → scoring → memo) is solid, but enrichment + scoring + memo + voice + PDD are each a full day's work. If PDD stays, apply it to memo generation only.</p>
+  </div>
+  <div class="pageno"></div>
+</section>
+<!-- ═══ 8 · ROLES ═══ -->
+<section id="s8" class="roles">
+  <h2>WHO OWNS WHAT</h2>
+  <p class="sub">Four lanes. Nobody waits on anybody until the first integration at H+4.</p>
+  <div class="grid2">
+    <div class="card"><div class="label">1 · RETRIEVAL</div><ul>
+      <li>Product docs → chunks → embeddings</li>
+      <li>Returns top passages + confidence score</li>
+      <li>Owns the threshold; below it, nothing fires</li>
+    </ul><div class="done">DONE WHEN — a typed question returns the right passage</div></div>
+    <div class="card"><div class="label">2 · AUDIO</div><ul>
+      <li>ElevenLabs transcription, both sides</li>
+      <li>Splits the stream into utterances</li>
+      <li>Hands clean text to the trigger lane</li>
+    </ul><div class="done">DONE WHEN — speech becomes text in under a second</div></div>
+    <div class="card hotmark"><div class="label hot">3 · TRIGGER — hardest, start first</div><ul>
+      <li>Cerebras: question? technical? asked already?</li>
+      <li>Tuned to stay silent on small talk</li>
+      <li>Runs on fake transcripts until H+4</li>
+    </ul><div class="done">DONE WHEN — of 10 test lines, only the right 3 fire</div></div>
+    <div class="card"><div class="label">4 · SCREEN &amp; DEMO</div><ul>
+      <li>The keyword card, big and glanceable</li>
+      <li>Writes + rehearses the 3-minute demo</li>
+      <li>Owns the fallback if audio dies on stage</li>
+    </ul><div class="done">DONE WHEN — the card renders from a fake JSON payload</div></div>
+  </div>
+  <div class="pageno"></div>
+</section>
+<!-- ═══ 9 · TIMELINE ═══ -->
+<section id="s9">
+  <h2>TOMORROW — 12 HOURS</h2>
+  <p class="sub">Everything runs on fake data until H+4. Nothing new gets built after H+8.</p>
+  <div class="tl">
+    <div class="axis">
+      <div></div>
+      <div class="hlabel" style="grid-column:2">H+0</div><div class="hlabel"></div>
+      <div class="hlabel">H+2</div><div class="hlabel"></div>
+      <div class="hlabel">H+4</div><div class="hlabel"></div>
+      <div class="hlabel">H+6</div><div class="hlabel"></div>
+      <div class="hlabel">H+8</div><div class="hlabel"></div>
+      <div class="hlabel">H+10</div><div class="hlabel">H+12</div>
+    </div>
+    <div class="axis"><div class="lane-name" style="color:var(--orange)">ALL HANDS</div>
+      <div class="bar b-or" style="grid-column:2/3"></div>
+      <div style="grid-column:3/14;display:flex;align-items:center;font-weight:800;color:var(--navy);font-size:clamp(12px,1.15vw,16px);padding-left:10px">ALIGN — scope, API keys, and the JSON each lane returns</div>
+    </div>
+    <div class="axis"><div class="lane-name">1 · RETRIEVAL</div>
+      <div class="bar b-nv" style="grid-column:2/6">docs → embeddings</div>
+      <div class="bar b-nv2" style="grid-column:6/10">tune retrieval + threshold</div>
+    </div>
+    <div class="axis"><div class="lane-name">2 · AUDIO</div>
+      <div class="bar b-nv" style="grid-column:2/6">live transcription</div>
+      <div class="bar b-nv2" style="grid-column:6/10">utterances + latency</div>
+    </div>
+    <div class="axis"><div class="lane-name">3 · TRIGGER</div>
+      <div class="bar b-nv" style="grid-column:2/7">classifier v1 on fake transcripts</div>
+      <div class="bar b-nv2" style="grid-column:7/10">silence tuning, real speech</div>
+    </div>
+    <div class="axis"><div class="lane-name">4 · SCREEN</div>
+      <div class="bar b-nv" style="grid-column:2/6">card from fake JSON</div>
+      <div class="bar b-nv2" style="grid-column:6/10">demo script + rehearsal</div>
+    </div>
+    <div class="axis"><div class="lane-name" style="color:var(--orange)">ALL HANDS</div>
+      <div class="bar b-or" style="grid-column:10/12">FREEZE + CACHE</div>
+      <div class="bar b-nv" style="grid-column:12/14">REHEARSE ×2</div>
+    </div>
+    <div class="ms"><i>▲ H+4 first end-to-end run</i><i>▲ H+8 feature freeze</i><i></i></div>
+  </div>
+  <div class="rules">
+    <div class="card"><b>MOCK FIRST</b><p>Every lane runs on fake data until H+4.</p></div>
+    <div class="card"><b>ONE CONTRACT</b><p>Agree the JSON between lanes in hour one.</p></div>
+    <div class="card"><b>AFTER H+8</b><p>Bugs only. No new ideas, no new libraries.</p></div>
+  </div>
+  <div class="pageno"></div>
+</section>
+<!-- ═══ 6 · SHARED ═══ -->
+<section class="dark" id="s6">
+  <h2>WHAT'S TRUE FOR ALL THREE</h2>
+  <p class="sub">Credits don't have to be spent. Cerebras + ElevenLabs carries every version of this.</p>
+  <div class="stack">
+    <div>
+      <div class="sechead">THE STACK</div>
+      <div class="rowline"><b>Cerebras</b><span>Open models, very fast. Not smarter — faster.</span><em class="tagm must">MUST</em></div>
+      <div class="rowline"><b>ElevenLabs</b><span>Best-in-class multilingual TTS + speech recognition.</span><em class="tagm must">MUST</em></div>
+      <div class="rowline"><b>MiniMax</b><span>At most a short explainer clip.</span><em class="tagm opt">OPT</em></div>
+      <div class="rowline"><b>TokenRouter</b><span>Cheap model detects, strong model answers.</span><em class="tagm opt">OPT</em></div>
+      <div class="rowline" style="border-bottom:none"><b>Respan</b><span>Unverified — check the sponsor page.</span><em class="tagm opt">SKIP</em></div>
+    </div>
+    <div>
+      <div class="sechead">SAY IT BEFORE A JUDGE ASKS</div>
+      <div class="darkcard"><ul style="list-style:none">
+        <li style="display:flex;gap:.6em;align-items:baseline;padding:.3em 0"><span style="flex:0 0 .42em;width:.42em;height:.42em;background:var(--orange);display:inline-block"></span>Runs on APIs — local models aren't feasible in 12h</li>
+        <li style="display:flex;gap:.6em;align-items:baseline;padding:.3em 0"><span style="flex:0 0 .42em;width:.42em;height:.42em;background:var(--orange);display:inline-block"></span>Production path is on-device / private</li>
+        <li style="display:flex;gap:.6em;align-items:baseline;padding:.3em 0"><span style="flex:0 0 .42em;width:.42em;height:.42em;background:var(--orange);display:inline-block"></span>No real personal docs — samples only</li>
+      </ul></div>
+      <div class="sechead">SHARED RISKS</div>
+      <div class="risk"><b>OCR on photos</b><span>Demo with a text PDF</span></div>
+      <div class="risk"><b>Voice latency</b><span>Fall back to typed input</span></div>
+      <div class="risk"><b>"Just RAG?"</b><span>Voice + grounding + trigger logic</span></div>
+      <div class="risk"><b>Venue network</b><span>Pre-cache one path</span></div>
+    </div>
+  </div>
+  <div class="pageno"></div>
+</section>
+<!-- ═══ 4 · IDEA 2 ═══ -->
+<section id="s4">
+  <div class="headrow">
+    <div class="num">2</div>
+    <h2>ASK IN YOUR LANGUAGE</h2>
+    <div class="pill" style="background:var(--navy)">FALLBACK</div>
+  </div>
+  <p class="sub">Upload an English lease. Ask in your own language. Hear the answer back in it, clause highlighted.</p>
+  <div class="strip">
+    <div class="chip">Korean</div><div class="chip">Mandarin</div><div class="chip">Spanish</div>
+    <div class="callout" style="background:var(--card);color:var(--navy)">Not a translator — Google Translate hands you a translated lease; you still don't know whether to sign it.</div>
+  </div>
+  <div class="grid2">
+    <div class="card hotmark"><div class="label hot">GOAL</div><ul>
+      <li>Answer "is this safe to sign?"</li>
+      <li>Voice-first for non-native readers</li>
+      <li>Trust via clause-level grounding</li>
+    </ul></div>
+    <div class="card"><div class="label">TOOLS</div><ul>
+      <li>ElevenLabs — multilingual speech in and out</li>
+      <li>Cerebras — fast grounded answers</li>
+      <li>RAG over one doc type: leases</li>
+    </ul></div>
+    <div class="card"><div class="label">FINISHED PRODUCT</div><ul>
+      <li>Ask by voice in any language</li>
+      <li>Spoken answer + clause highlighted</li>
+      <li>Risky-clause check on request</li>
+    </ul></div>
+    <div class="card"><div class="label">LIMITS &amp; RISKS</div><ul>
+      <li>Quality drops at the last translation hop</li>
+      <li>One doc type only, or 12 hours vanish</li>
+      <li>"Isn't this just RAG?" needs an answer</li>
+    </ul></div>
+  </div>
+  <div class="pageno"></div>
+</section>
+<!-- ═══ 5 · IDEA 3 ═══ -->
+<section id="s5">
+  <div class="headrow">
+    <div class="num">3</div>
+    <h2>SENIOR DOCUMENT ASSISTANT</h2>
+    <div class="pill" style="background:var(--navy)">FALLBACK</div>
+  </div>
+  <p class="sub">Insurance policies, hospital forms — snap a photo, ask out loud, get an answer out loud.</p>
+  <div class="banner">Same build as Idea 2, different user. Voice isn't decoration here — it's the only usable interface.</div>
+  <div class="grid2">
+    <div class="card hotmark"><div class="label hot">GOAL</div><ul>
+      <li>Paperwork seniors can just ask</li>
+      <li>Voice as the only interface needed</li>
+      <li>Every answer shows its source</li>
+    </ul></div>
+    <div class="card"><div class="label">TOOLS</div><ul>
+      <li>Same stack as Idea 2</li>
+      <li>Plus OCR for photographed forms</li>
+      <li>MiniMax optional: a short clip</li>
+    </ul></div>
+    <div class="card"><div class="label">FINISHED PRODUCT</div><ul>
+      <li>Snap a photo, ask out loud</li>
+      <li>Spoken answer + source passage</li>
+      <li>Pivots ready: meds, scam calls</li>
+    </ul></div>
+    <div class="card"><div class="label">LIMITS &amp; RISKS</div><ul>
+      <li>OCR on phone photos is the weak point</li>
+      <li>Sample and public forms only</li>
+      <li>Least differentiated of the three</li>
+    </ul></div>
+  </div>
+  <div class="pageno"></div>
+</section>
+
+<nav class="navdots" id="dots"></nav>
+
+<script>
+const secs=[...document.querySelectorAll('section')];
+const dots=document.getElementById('dots');
+secs.forEach((s,i)=>{
+  const a=document.createElement('a');
+  a.href='#'+s.id;
+  dots.appendChild(a);
+});
+const das=[...dots.children];
+const obs=new IntersectionObserver(es=>{
+  es.forEach(e=>{
+    if(e.isIntersecting){
+      const i=secs.indexOf(e.target);
+      das.forEach((d,j)=>d.classList.toggle('on',j===i));
+    }
+  });
+},{threshold:.55});
+secs.forEach(s=>obs.observe(s));
+secs.forEach((sc,i)=>{const pn=sc.querySelector('.pageno');if(pn)pn.textContent=(i+1)+' / '+secs.length;});
+document.addEventListener('keydown',e=>{
+  const cur=das.findIndex(d=>d.classList.contains('on'));
+  if(e.key==='ArrowDown'||e.key==='PageDown'||e.key===' '){e.preventDefault();secs[Math.min(cur+1,secs.length-1)].scrollIntoView();}
+  if(e.key==='ArrowUp'||e.key==='PageUp'){e.preventDefault();secs[Math.max(cur-1,0)].scrollIntoView();}
+});
+</script>
+</body>
+</html>
