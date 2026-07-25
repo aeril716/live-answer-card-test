@@ -4,3 +4,4 @@ __pycache__/
 chroma_db/
 demo_cache.json
 .rocketride/
+litellm_cache.sqlite/
