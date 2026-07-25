@@ -105,6 +105,8 @@ def _ws_worker() -> None:
                     break
                 if not raw:
                     continue
+                if os.environ.get("AUDIO_DEBUG") == "1":
+                    print(f"[audio] recv={str(raw)[:220]}")
                 try:
                     msg = json.loads(raw)
                 except Exception:
