@@ -94,6 +94,10 @@ header[data-testid="stHeader"], #MainMenu, footer {display:none;}
 .lac .src b{color:#4DA3FF; font-weight:700;}
 .lac .conf{margin-top:16px; font-size:13px; color:#8B96B0;}
 .lac .conf b{color:#FFC94D; font-weight:800;}
+.lac .tabsrow{margin-top:20px; display:flex; gap:8px; flex-wrap:wrap;}
+.lac .tab{border:1px solid #243560; border-radius:8px; padding:7px 14px;
+  font-size:12px; font-weight:700; letter-spacing:.04em; color:#8B96B0;}
+.lac .tab.on{background:#4DA3FF; border-color:#4DA3FF; color:#0A1430;}
 .lac .nothing{text-align:center; color:#5A6685; padding:48px 0 30px;}
 .lac .nothing .big{font-size:clamp(22px,3.4vw,34px); font-weight:700; letter-spacing:.04em;}
 .lac .nothing .why{margin-top:10px; font-size:14px; letter-spacing:.12em; font-weight:600;}
@@ -101,7 +105,7 @@ header[data-testid="stHeader"], #MainMenu, footer {display:none;}
 """
 
 
-def _card_markdown(card, question=""):
+def _card_markdown(card, question="", tabs=None):
     # One single markdown element: st.empty() replaces it atomically, which
     # avoids ghost fragments. Faithful to
     # ignore-gameplan.context/live_answer_card_prototype.html: header bar with
@@ -138,7 +142,14 @@ def _card_markdown(card, question=""):
         body = (f'<div class="nothing"><div class="big">— nothing —</div>'
                 f'<div class="why">{why}</div></div>')
 
-    return f'<div class="lac">{head}{qrow}{body}</div>'
+    tabsrow = ""
+    if tabs:
+        cells = "".join(
+            f'<span class="tab{" on" if on else ""}">{_html.escape(lbl)}</span>'
+            for lbl, on in tabs)
+        tabsrow = f'<div class="tabsrow">{cells}</div>'
+
+    return f'<div class="lac">{head}{qrow}{body}{tabsrow}</div>'
 
 
 def _scene_label(i, item):
@@ -199,7 +210,9 @@ def _run_app():
             u = mods["audio"].get_utterance()
             if not u.get("text"):
                 empties += 1
-                if empties > 100:  # mock sequence exhausted; stop cleanly
+                # mock: stop when the scripted call is exhausted. Real mic:
+                # keep listening until Stop — calls have natural silence.
+                if mock_audio and empties > 100:
                     st.session_state.running = False
                     break
                 time.sleep(0.1)
@@ -214,8 +227,11 @@ def _run_app():
                 # keywords, and non-triggering talk is never shown
                 mods["screen"].render(card)
                 hist.append({"q": u.get("text", ""), "card": card})
-                placeholder.markdown(_card_markdown(card, u.get("text", "")),
-                                     unsafe_allow_html=True)
+                tabs = [(_scene_label(i, h), i == len(hist) - 1)
+                        for i, h in enumerate(hist)]
+                placeholder.markdown(
+                    _card_markdown(card, u.get("text", ""), tabs),
+                    unsafe_allow_html=True)
                 if mock_audio:
                     time.sleep(2.5)  # pace the replay so cards are watchable
 
@@ -231,7 +247,8 @@ def _run_app():
                     idx = i
                     st.session_state.scene = i
             item = hist[idx]
-            placeholder.markdown(_card_markdown(item["card"], item["q"]),
+            tabs = [(_scene_label(i, h), i == idx) for i, h in enumerate(hist)]
+            placeholder.markdown(_card_markdown(item["card"], item["q"], tabs),
                                  unsafe_allow_html=True)
 
 
