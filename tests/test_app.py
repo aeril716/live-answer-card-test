@@ -7,11 +7,18 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import app
 
 
-def test_load_modules_stubs_missing_retrieval():
+def test_load_modules_returns_all_four_lanes():
     mods, missing = app.load_modules()
-    assert "retrieval" in missing  # not on main yet
-    card = mods["retrieval"].answer("Are you SOC 2 certified?")
-    assert card == app.EMPTY_CARD
+    assert set(mods) == {"audio", "trigger", "retrieval", "screen"}
+    for name in missing:  # anything missing must be a working stub
+        assert getattr(mods[name], "_is_stub", False)
+
+
+def test_stub_returns_frozen_empty_shapes():
+    stub = app._stub("x")
+    assert stub.answer("q") == app.EMPTY_CARD
+    assert stub.should_fire({}) == app.EMPTY_DECISION
+    assert stub.get_utterance() == app.EMPTY_UTTERANCE
 
 
 def test_loaded_real_modules_are_not_stubs():
