@@ -44,33 +44,53 @@ def _start_ws_thread() -> None:
 def _ws_worker() -> None:
     """Runs forever in the background: mic capture + WebSocket send/recv,
     with automatic reconnect on failure. Never raises out of this thread."""
+    import base64
     import sounddevice as sd
     import websocket
+    import requests
 
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+    except Exception:
+        pass
     api_key = os.environ.get("ELEVENLABS_API_KEY", "")
-    url = "wss://api.elevenlabs.io/v1/speech-to-text/stream"
 
     while True:
         try:
-            ws = websocket.create_connection(
-                url,
-                header=[f"xi-api-key: {api_key}"],
-                timeout=5,
+            # Scribe v2 realtime auth: mint a single-use token, pass it as a
+            # query parameter; the ws handshake itself takes no api key.
+            resp = requests.post(
+                "https://api.elevenlabs.io/v1/single-use-token/realtime_scribe",
+                headers={"xi-api-key": api_key},
+                timeout=10,
             )
+            resp.raise_for_status()
+            payload = resp.json()
+            token = payload.get("token") or payload.get("single_use_token") or ""
+            url = (
+                "wss://api.elevenlabs.io/v1/speech-to-text/realtime"
+                "?model_id=scribe_v2_realtime&sample_rate=16000"
+                f"&commit_strategy=vad&token={token}"
+            )
+            ws = websocket.create_connection(url, timeout=10)
 
             stop_flag = threading.Event()
 
             def _on_audio(indata, frames, time_info, status):
                 try:
-                    chunk = indata.tobytes()
-                    ws.send_binary(chunk)
+                    ws.send(json.dumps({
+                        "message_type": "input_audio_chunk",
+                        "audio_base_64": base64.b64encode(bytes(indata)).decode(),
+                    }))
                     if _benchmark:
                         _pending_send_times[str(time.time())] = time.time()
                 except Exception:
                     stop_flag.set()
 
             stream = sd.RawInputStream(
-                samplerate=16000, channels=1, dtype="int16", callback=_on_audio
+                samplerate=16000, channels=1, dtype="int16", blocksize=4000,
+                callback=_on_audio
             )
             stream.start()
 
@@ -87,10 +107,10 @@ def _ws_worker() -> None:
                 except Exception:
                     continue
 
-                msg_type = msg.get("type", "")
-                if msg_type == "partial_transcript":
+                msg_type = msg.get("message_type", msg.get("type", ""))
+                if msg_type in ("partial_transcript", "session_started"):
                     continue  # discard partials per spec
-                if msg_type == "committed_transcript":
+                if msg_type in ("committed_transcript", "final_transcript"):
                     text = msg.get("text", "")
                     if not text:
                         continue
