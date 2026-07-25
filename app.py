@@ -170,7 +170,10 @@ def _run_app():
     st.sidebar.markdown("[← Back to landing page](https://live-answer-card-landing.onrender.com)")
     if missing:
         st.sidebar.warning("Stubbed (not on main yet): " + ", ".join(missing))
-    mode = st.sidebar.radio("Mode", ["Typed", "Live"], index=0)
+    # open the page with ?live=1 to boot straight into Live and auto-start
+    auto_live = str(st.query_params.get("live", "")) in ("1", "true")
+    mode = st.sidebar.radio("Mode", ["Typed", "Live"],
+                            index=1 if auto_live else 0)
     st.session_state.setdefault("running", False)
 
     if mode == "Typed":
@@ -191,7 +194,11 @@ def _run_app():
             )
         hist = st.session_state.setdefault("history", [])
         col_a, col_b = st.sidebar.columns(2)
-        if col_a.button("Start"):
+        start_clicked = col_a.button("Start")
+        if auto_live and not st.session_state.get("autostarted"):
+            st.session_state.autostarted = True
+            start_clicked = True  # page opened with ?live=1: start immediately
+        if start_clicked:
             if getattr(mods["audio"], "USE_MOCK", False):
                 # replay the rehearsed mock call from the top on every Start
                 mods["audio"] = importlib.reload(mods["audio"])
