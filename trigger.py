@@ -130,17 +130,28 @@ def _is_repeat(text):
 
 
 def _rewrite(text):
-    """Extract a clean retrieval-ready question, keeping product names."""
-    segments = re.split(r"(?<=[.!])\s+|\s+—\s+", text.strip())
+    """Extract a clean retrieval-ready question, keeping product names.
+
+    Live transcripts can be crosstalk blobs holding several sentences; the
+    question sentence that names a technical topic wins, so retrieval gets
+    "Do you support SSO?" instead of the surrounding chatter.
+    """
+    sentences = [s.strip() for s in
+                 re.split(r"(?<=[.!?])\s+|\s+—\s+", text.strip()) if s.strip()]
+    questions = [s for s in sentences if s.endswith("?")]
     candidate = ""
-    for seg in segments:
-        if "?" in seg:
-            candidate = seg.strip()
+    if questions:
+        low = [" " + _normalize(q) + " " for q in questions]
+        keyed = [q for q, l in zip(questions, low)
+                 if any(k in l for k in _TECH_KEYWORDS)]
+        candidate = (keyed or questions)[-1]
     if not candidate:
         candidate = text.strip()
+    # a product named elsewhere in the utterance must reach retrieval
     low_all, low_seg = text.lower(), candidate.lower()
-    if any(p in low_all and p not in low_seg for p in _PRODUCTS):
-        candidate = text.strip()
+    missing = [p for p in _PRODUCTS if p in low_all and p not in low_seg]
+    if missing:
+        candidate = f"{missing[0].title()} — {candidate}"
     candidate = re.sub(r"^(anyway|wait|so|oh|well|okay|ok|right|sorry)[,\s]+",
                        "", candidate, flags=re.IGNORECASE)
     candidate = re.sub(r"^[A-Z][a-z]+,\s+", "", candidate)  # "Dave, ..."
