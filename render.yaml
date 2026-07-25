@@ -20,6 +20,10 @@ services:
     buildCommand: pip install -r requirements.txt && python ingest.py --if-missing
     startCommand: streamlit run app.py --server.port $PORT --server.address 0.0.0.0
     envVars:
+      # Not a secret — committed directly. Flips retrieval.py and
+      # ingest.search() from canned mock cards to the real ingested store.
+      - key: RETRIEVAL_USE_MOCK
+        value: "false"
       # Primary fast model (required). Set the four values in the dashboard.
       - key: FAST_MODEL_PROVIDER
         sync: false
