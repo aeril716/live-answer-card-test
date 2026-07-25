@@ -42,6 +42,8 @@ It receives:
 5. The empty state is a bordered box containing a dash — visibly deliberate,
    never a blank line or an error message. On stage we show it on purpose, to
    prove a decision layer exists.
+6. Given `render()` is called, then it prints one line in the form
+   `[screen] in=conf=<confidence> out=<rendered|empty>`.
 
 ## Must not
 
