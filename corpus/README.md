@@ -150,7 +150,8 @@ is grounded rather than agreeable.
 
 > **Prospect:** "Makes sense. Anyway, how was your weekend?"
 
-Screen stays empty. Hold it and let people see the blank screen.
+The screen shows the designed empty state: a bordered box containing `-`. Hold
+it and let people see that the silence is deliberate.
 
 > "That's the part we actually built. Answering is the easy half — deciding when
 > not to answer is what keeps a rep trusting the screen."
