@@ -7,6 +7,9 @@ import json
 import queue
 import threading
 from typing import Dict, Any, List
+from dotenv import load_dotenv
+
+load_dotenv()
 
 USE_MOCK: bool = True
 EMPTY: Dict[str, Any] = {"text": "", "speaker": "unknown", "ts": 0.0}
