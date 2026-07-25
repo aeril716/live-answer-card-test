@@ -1,0 +1,36 @@
+% PDD prompt for model_client.py — Lane 3
+
+Write model_client.py, a Python module exposing exactly one function:
+
+    def fast_complete(prompt: str, max_tokens: int = 200) -> str:
+
+Requirements:
+- Provider-agnostic: reads FAST_MODEL_PROVIDER, FAST_MODEL_NAME,
+  FAST_MODEL_BASE_URL, FAST_MODEL_API_KEY from environment variables (.env).
+- Given valid provider/model/base URL/key config, fast_complete("hi") returns
+  the model's text response.
+- Given a timeout or any error, fast_complete() returns "" and never raises
+  an exception under any circumstance.
+- A module-level constant USE_MOCK = True at the top of the file. When
+  USE_MOCK is True, fast_complete() returns a canned string immediately and
+  makes no network call at all.
+- Support an optional fallback provider. If FALLBACK_MODEL_PROVIDER,
+  FALLBACK_MODEL_NAME, FALLBACK_MODEL_BASE_URL, and FALLBACK_MODEL_API_KEY
+  are all set in the environment, and the primary provider times out or
+  errors, retry once against the fallback provider and print which provider
+  actually served the call.
+- If no fallback is configured and the primary provider fails, return ""
+  without retrying.
+- Every network call must have an explicit timeout at or under 3 seconds.
+- The module must print one line on entry and one line on exit, including
+  key inputs and outputs, but must never print the API key itself.
+- Keep the file under about 60 lines. Plain Python, no classes, no async,
+  no web framework.
+- Include a __main__ block that calls fast_complete("hi") once and prints
+  the result, for manual smoke testing.
+
+Must not:
+- Must not raise under any circumstance — always catch and return "".
+- Must not hardcode any API key.
+- Must not print the API key value anywhere, ever.
+- Must not import any web framework beyond what's needed for HTTP requests.
