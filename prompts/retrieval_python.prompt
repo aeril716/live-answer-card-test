@@ -1,57 +1,82 @@
-% retrieval_python.prompt — retrieval.answer(), mock version
-% Reference conversion of the Lane 1 retrieval issue
-% (ignore-gameplan.context/lane1_mock_issue.md). See docs/writing-pdd-prompts.md
-% for what was kept, what was stripped, and why.
+<pdd-reason>Turns a technical question into a glanceable keyword card, or stays silent when unsure.</pdd-reason>
+
+<pdd-interface>
+{
+  "type": "module",
+  "module": {
+    "functions": [
+      {"name": "answer", "signature": "(question: str)", "returns": "dict"}
+    ]
+  }
+}
+</pdd-interface>
+
+<pdd-dependency>ingest_python.prompt</pdd-dependency>
+<pdd-dependency>model_client_python.prompt</pdd-dependency>
 
 <include>context/project_preamble.prompt</include>
 
-MODULE
+% Goal
+Answer a prospect's technical question from the corpus as two or three large
+keywords a rep can glance at and say — and show nothing at all when the system
+is not confident, because a wrong card costs more than a blank one.
 
-Write `retrieval.py`. It exposes `answer(question)` returning a keyword card.
-Mock only in this version — real search over `corpus/` comes in a later prompt.
+% Role & Scope
+Create root-level `retrieval.py`. `answer(question)` returns a keyword card.
+This real version replaces the earlier mock behind the same interface: it
+searches the corpus store via `ingest.search()` and phrases keywords via
+`model_client.fast_complete()`. It owns retrieval, keyword phrasing, and the
+confidence decision; it does not build the store and does not classify whether
+a question should fire (that is the trigger's job).
 
-INTERFACE — frozen
-
+% Interface
     def answer(question: str) -> dict:
-        # Example return value:
-        # {
-        #     "keywords": ["SOC 2 — YES", "TYPE II", "NDA → REPORT"],
-        #     "detail": "SOC 2 Type II, renewed March 2026 after an external audit.",
-        #     "source": "security-overview.md §1.1",
-        #     "confidence": 0.91,
-        # }
+        # Example:
+        # {"keywords": ["SOC 2 — YES", "TYPE II", "NDA → REPORT"],
+        #  "detail": "SOC 2 Type II across all products, renewed March 2026.",
+        #  "source": "security-overview.md §1.1", "confidence": 0.91}
 
     EMPTY = {"keywords": [], "detail": "", "source": "", "confidence": 0.0}
 
-BEHAVIOR
-
-1. Given `USE_MOCK = True` at the top of the file, when `answer()` is called,
-   then it returns canned data immediately and makes no network call.
-2. Given a question containing "SOC 2", then a card with three keywords and
-   confidence above 0.6 is returned.
-3. Given a question about data retention, then a different canned card is
-   returned.
-4. Given a question about self-hosting, then a third canned card is returned.
-5. Given any other question, then EMPTY is returned — the empty state must be
-   reachable.
-6. Given any internal error, then EMPTY is returned and nothing is raised.
-7. Every call prints one line in the form
+% Contract rules
+R1 (MUST): Return a dict with exactly the keys `keywords` (list), `detail`
+   (str), `source` (str), `confidence` (float). Never add, rename, or drop keys.
+R2 (MUST): When `USE_MOCK = True`, return canned cards consistent with the
+   corpus and make no network call. A question mentioning SOC 2 returns a card
+   sourced to `security-overview.md §1.1` with confidence above 0.6; a data-
+   retention question and a self-hosting question each return a different canned
+   card; any other question returns EMPTY.
+R3 (MUST): In real mode, derive `source` from the best retrieved passage and
+   `detail` from that passage in one or two sentences.
+R4 (MUST): Show a card only when confidence is at least 0.6. Below 0.6, return
+   EMPTY — the empty state must be reachable for out-of-corpus and small-talk
+   questions.
+R5 (SHOULD): Derive confidence from retrieval relevance, biased low, so that an
+   uncertain match stays below the 0.6 threshold rather than above it.
+R6 (MUST): Produce at most three keywords, uppercase-ready, the first carrying
+   the answer. Keywords come from `model_client.fast_complete()` when it returns
+   usable text, but every keyword must be grounded in the retrieved passage.
+   When the completion is empty or nothing grounded survives, build the keywords
+   from the retrieved passage's section heading instead.
+R7 (MUST NOT): Return a card whose `keywords` are non-empty but whose `source`
+   is empty.
+R8 (MUST NOT): Raise. Any internal error returns EMPTY.
+R9 (MUST): Print one line per call in the form
    `[retrieval] in=<question> out_conf=<confidence>`.
 
-Canned card content must be consistent with the corpus (`corpus/`), e.g. the
-SOC 2 card with `security-overview.md §1.1`.
+% Notes for the generator
+- The retrieval method, chunking, embedding model, and the exact confidence
+  formula are implementation choices — pick them, verify against the corpus
+  test set, and explain them in the PR, not here.
+- Keep the whole `answer()` path comfortably inside the 3-second budget; every
+  network call carries an explicit timeout at or under its stage budget.
 
-MUST NOT
+% Dependencies
+The preamble supplies the frozen interfaces and the project-wide code rules.
+`ingest.search(query, k=3)` returns ranked `{"text","source","score"}` passages.
+`model_client.fast_complete(prompt, max_tokens=200)` returns keyword text or
+`""` on any failure.
 
-- Must not raise under any circumstance.
-- Must not import chromadb, requests, or any network library in this version.
-- Must not return more than three keywords.
-- Must not return a card with an empty `source` field.
-
-VALIDATION
-
-- Running `python retrieval.py` executes a `__main__` block that calls the
-  three known questions plus one unknown question and prints all four results.
-- Done when: `answer()` returns a valid card for the three known questions, an
-  unknown question returns EMPTY, and `python retrieval.py` runs clean with no
-  network.
+% Deliverables
+- Code: `retrieval.py`
+- Tests: `tests/test_retrieval.py`
