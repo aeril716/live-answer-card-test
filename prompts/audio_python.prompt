@@ -1,0 +1,40 @@
+<pdd-reason>Provides a non-blocking offline source of ordered demo utterances for the application loop.</pdd-reason>
+
+<pdd-interface>
+{
+  "type": "module",
+  "module": {
+    "functions": [
+      {"name": "get_utterance", "signature": "()", "returns": "dict"}
+    ]
+  }
+}
+</pdd-interface>
+
+<include>context/project_preamble.prompt</include>
+
+% Goal
+Create the root-level `audio.py` mock utterance source.
+
+% Role & Scope
+Expose a synchronous, process-local source that returns one deterministic demo
+utterance per call. Microphone input and live transcription are out of scope.
+
+% Requirements
+1. Export `get_utterance() -> dict` and `EMPTY = {"text": "", "speaker": "unknown", "ts": 0.0}`. The first result is exactly `{"text": "Are you guys SOC 2 certified?", "speaker": "prospect", "ts": 252.4}`.
+2. Define and export the module-level setting `USE_MOCK = True` near the top of `audio.py`. While it remains true, return four hardcoded prospect utterances in order: the frozen SOC 2 question, a Type I/Type II follow-up, weekend small talk, and a pricing question.
+3. Return each utterance exactly once in repeated single-threaded calls, with fixed timestamps that strictly increase.
+4. After exhaustion, and whenever `USE_MOCK = False` in this mock-only version, return a fresh EMPTY-shaped dictionary on every call.
+5. Return immediately without waiting, sleeping, asynchronous work, device I/O, network I/O, or imports of `websockets`, `requests`, or audio libraries.
+6. Return defensive dictionaries so caller mutation cannot affect the canonical sequence, future results, or `EMPTY`.
+7. Given any internal failure, return a fresh EMPTY-shaped dictionary and raise nothing.
+8. Emit exactly one safe single-line log per invocation in the form `[audio] out=<text>`, including an empty value after exhaustion or fallback. Importing the module emits nothing.
+9. Include a guarded `__main__` demonstration that calls `get_utterance()` six times and prints every result, showing four ordered utterances followed by two EMPTY results.
+
+% Dependencies
+None.
+
+% Deliverables
+- Code: `audio.py`
+- Example: `context/audio_example.py`
+- Tests: `tests/test_audio.py`

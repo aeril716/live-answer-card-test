@@ -1,0 +1,11 @@
+gate: git-diff-check
+cmd: /tmp/pdd_job_pwlYgJtJT7l3U1OEcun5_pg_oucfu/.gh-wrapper/git diff --check origin/main...HEAD
+source: git:origin/main...HEAD
+started: 2026-07-25T21:05:07Z
+duration_seconds: 0.005
+exit_code: 0
+
+---- stdout ----
+
+---- stderr ----
+

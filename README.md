@@ -1,5 +1,26 @@
 # live-answer-card-test
 
+## Audio mock
+
+`audio.get_utterance()` provides a process-local, network-free source of demo
+utterances. With `USE_MOCK = True`, repeated calls return four prospect
+utterances once each, in order: a SOC 2 question, a Type I/Type II follow-up,
+weekend small talk, and a pricing question. Their timestamps increase across
+the sequence. After the fourth utterance, every later call returns:
+
+```python
+{"text": "", "speaker": "unknown", "ts": 0.0}
+```
+
+Calls return immediately, and each call logs `[audio] out=<text>`. Run the
+six-call demonstration to see the ordered sequence and permanent empty state:
+
+```sh
+python audio.py
+```
+
+This version uses no microphone, audio library, or network service.
+
 ## Terminal support screen
 
 `screen.py` provides `render(card)`, a dependency-free terminal preview of the

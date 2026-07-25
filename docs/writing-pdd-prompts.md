@@ -23,6 +23,7 @@ context/
   project_preamble.prompt      # shared: product, frozen interfaces, code rules
 prompts/
   _TEMPLATE_module_python.prompt
+  audio_python.prompt          # Lane 2, mock utterance source
   retrieval_python.prompt      # reference conversion — copy its shape
   trigger_python.prompt        # Lane 3, converted from issue #10
   model_client_python.prompt   # Lane 3, converted from issue #10
