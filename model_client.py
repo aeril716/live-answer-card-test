@@ -1,8 +1,16 @@
 import os
-import requests
-from dotenv import load_dotenv
 
-load_dotenv()
+# Optional third-party deps: mock mode must run on a fresh clone with nothing
+# installed. Real-provider calls need requests (see requirements.txt).
+try:
+    import requests
+except Exception:
+    requests = None
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except Exception:
+    pass
 
 USE_MOCK: bool = True
 
@@ -43,6 +51,9 @@ def fast_complete(prompt: str, max_tokens: int = 200) -> str:
     served_by = "NONE"
 
     for provider, model, url, key in configs:
+        if requests is None:
+            print("EXIT fast_complete | provider=NONE | requests not installed")
+            return ""
         if not (provider and model and url and key):
             continue
             
