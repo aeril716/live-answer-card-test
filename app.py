@@ -149,6 +149,7 @@ def _run_app():
     mods, missing = load_modules()
 
     st.sidebar.title("Live Answer Card")
+    st.sidebar.markdown("[← Back to landing page](https://live-answer-card-landing.onrender.com)")
     if missing:
         st.sidebar.warning("Stubbed (not on main yet): " + ", ".join(missing))
     mode = st.sidebar.radio("Mode", ["Typed", "Live"], index=0)
