@@ -1,0 +1,38 @@
+% PDD prompt for audio.py — Lane 2 mock version
+
+Write audio.py, a Python module exposing exactly one function:
+
+    def get_utterance() -> dict:
+
+Requirements:
+- A module-level constant USE_MOCK = True at the top of the file.
+- When USE_MOCK is True, get_utterance() replays a hardcoded list of
+  utterances, one per call, and makes no network call.
+- The hardcoded list, in this exact order:
+  1. {"text": "Are you guys SOC 2 certified?", "speaker": "prospect", "ts": 252.4}
+  2. A follow-up utterance asking whether it's Type I or Type II, speaker
+     "prospect", with a later ts.
+  3. A small-talk utterance about the weekend, speaker "prospect", with a
+     later ts.
+  4. A pricing question, speaker "prospect", with a later ts.
+  ts values must strictly increase across the list.
+- Each call to get_utterance() returns the next utterance in the list,
+  advancing an internal index. Each utterance is returned exactly once.
+- Once the list is exhausted, every subsequent call returns
+  EMPTY = {"text": "", "speaker": "unknown", "ts": 0.0}.
+- get_utterance() must return immediately and never block the calling
+  thread — no sleeps, no waiting on I/O.
+- Any internal error must be caught and EMPTY returned — never raise.
+- The module must print one line per call in the form:
+  [audio] out=<text>
+- Include a __main__ block that calls get_utterance() six times and prints
+  each result, so exhaustion of the 4-item list is visible (calls 5 and 6
+  should print EMPTY).
+
+Must not:
+- Must not raise under any circumstance.
+- Must not block the calling thread.
+- Must not return the same utterance twice.
+- Must not import websockets, requests, or any audio/network library.
+
+Keep the file short and plain — no classes, no async.
