@@ -26,6 +26,7 @@ prompts/
   retrieval_python.prompt      # reference conversion — copy its shape
   trigger_python.prompt        # Lane 3, converted from issue #3
   model_client_python.prompt   # Lane 3, converted from issue #3
+  band_python.prompt           # Lane 3, converted from issue #5 (optional feature)
 docs/
   writing-pdd-prompts.md       # this file
 ```
