@@ -1,0 +1,57 @@
+% retrieval_python.prompt — retrieval.answer(), mock version
+% Reference conversion of the Lane 1 retrieval issue
+% (ignore-gameplan.context/lane1_mock_issue.md). See docs/writing-pdd-prompts.md
+% for what was kept, what was stripped, and why.
+
+<include>context/project_preamble.prompt</include>
+
+MODULE
+
+Write `retrieval.py`. It exposes `answer(question)` returning a keyword card.
+Mock only in this version — real search over `corpus/` comes in a later prompt.
+
+INTERFACE — frozen
+
+    def answer(question: str) -> dict:
+        # Example return value:
+        # {
+        #     "keywords": ["SOC 2 — YES", "TYPE II", "NDA → REPORT"],
+        #     "detail": "SOC 2 Type II, renewed March 2026 after an external audit.",
+        #     "source": "security-overview.md §1.1",
+        #     "confidence": 0.91,
+        # }
+
+    EMPTY = {"keywords": [], "detail": "", "source": "", "confidence": 0.0}
+
+BEHAVIOR
+
+1. Given `USE_MOCK = True` at the top of the file, when `answer()` is called,
+   then it returns canned data immediately and makes no network call.
+2. Given a question containing "SOC 2", then a card with three keywords and
+   confidence above 0.6 is returned.
+3. Given a question about data retention, then a different canned card is
+   returned.
+4. Given a question about self-hosting, then a third canned card is returned.
+5. Given any other question, then EMPTY is returned — the empty state must be
+   reachable.
+6. Given any internal error, then EMPTY is returned and nothing is raised.
+7. Every call prints one line in the form
+   `[retrieval] in=<question> out_conf=<confidence>`.
+
+Canned card content must be consistent with the corpus (`corpus/`), e.g. the
+SOC 2 card with `security-overview.md §1.1`.
+
+MUST NOT
+
+- Must not raise under any circumstance.
+- Must not import chromadb, requests, or any network library in this version.
+- Must not return more than three keywords.
+- Must not return a card with an empty `source` field.
+
+VALIDATION
+
+- Running `python retrieval.py` executes a `__main__` block that calls the
+  three known questions plus one unknown question and prints all four results.
+- Done when: `answer()` returns a valid card for the three known questions, an
+  unknown question returns EMPTY, and `python retrieval.py` runs clean with no
+  network.

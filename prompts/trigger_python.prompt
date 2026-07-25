@@ -1,0 +1,94 @@
+% trigger_python.prompt — trigger.should_fire(), real version
+% Converted from issue #3 (Lane 3). One issue, two modules — this file covers
+% the classifier; the provider client lives in model_client_python.prompt.
+
+<include>context/project_preamble.prompt</include>
+
+MODULE
+
+Write `trigger.py`. It exposes `should_fire(utterance)`, which decides whether
+the screen shows anything at all: it classifies technical questions, small
+talk, repeats, and non-questions. All model access goes through
+`model_client.fast_complete()`.
+
+INTERFACE — frozen
+
+    def should_fire(utterance: dict) -> dict:
+        # {"fire": bool, "question": str, "reason": str}
+        # reason in {"technical", "smalltalk", "repeat", "not_a_question"}
+
+    EMPTY = {"fire": False, "question": "", "reason": "not_a_question"}
+
+DECISION ORDER
+
+Four decisions, evaluated in this order, cheap checks before expensive ones —
+decisions 1 and 3 should mostly resolve without a model call, which saves
+latency on every line of small talk, and most of a call is small talk:
+
+1. Is this a question at all? Statements and back-channel ("mm-hmm", "right",
+   "gotcha") never fire.
+2. Is it technical or spec-related? Pricing, scheduling, and small talk never
+   fire, even when phrased as questions.
+3. Has this question already been answered on this call? Re-firing the same
+   card turns the screen into noise and the rep stops trusting it.
+4. Is it phrased well enough for retrieval? If not, rewrite it into a clean
+   question string in the `question` field.
+
+BEHAVIOR
+
+1. Given the utterance "Are you SOC 2 certified?", when `should_fire()` is
+   called, then `fire` is True and `reason` is `"technical"`.
+2. Given the utterance "How was your weekend?", then `fire` is False and
+   `reason` is `"smalltalk"`.
+3. Given the utterance "How much does the enterprise tier cost?", then `fire`
+   is False — pricing is not technical.
+4. Given a question already answered earlier in the same call, when it is
+   asked again in different words, then `fire` is False and `reason` is
+   `"repeat"`.
+5. Given "mm-hmm", then `fire` is False, `reason` is `"not_a_question"`, and
+   no model call is made.
+6. Given the model returns malformed JSON, then EMPTY is returned and nothing
+   is raised.
+7. Given a 20-sentence labelled test set, when it is run, then at least 18
+   sentences classify correctly and no small-talk sentence fires.
+8. Given `USE_MOCK = True`, then classification comes from a hardcoded lookup
+   with no model call.
+9. Every call prints one line in the form
+   `[trigger] in=<text> fire=<bool> reason=<reason>`.
+10. A debug mode prints, per sentence, which of the four decisions stopped it
+    and why — every decision must be explainable in one line.
+
+The classifier model call must request strict JSON and parse defensively.
+
+Precision over recall (see preamble) governs every threshold in this module.
+State in a code comment exactly where that bias lives, so it can be moved
+during tuning without hunting for it.
+
+REPEAT DETECTION
+
+Start with the simple version: a list of answered questions for the current
+call plus a similarity check. Explain the tradeoff of the chosen approach in
+a comment. Then, behind a `USE_MEM0` flag (default False), implement the same
+check backed by the mem0 memory layer. The simple version remains the default
+and the fallback.
+
+MUST NOT
+
+- Must not raise under any circumstance — catch and return EMPTY.
+- Must not fire on pricing, scheduling, or small talk. Zero small-talk fires
+  is a hard gate, not a target.
+- Must not fire twice for the same question within one call.
+- Must not make a model call for back-channel or obvious non-questions.
+- Must not accept a model response wrapped in markdown fences or preamble
+  text — parse strictly, fail to EMPTY.
+- Must not import a model provider SDK — use `model_client.fast_complete()`.
+
+VALIDATION
+
+- Test: `pytest tests/test_trigger.py -q` — the 20-sentence labelled set,
+  running entirely against mocks with no network access.
+- The test set must include the hard cases: a technical question buried in
+  small talk, the same question asked twice in different words, and a
+  question addressed to the rep's colleague rather than to us.
+- Done when: the labelled set passes at 18/20 or better, zero small-talk
+  sentences fire, and the debug output explains every decision in one line.

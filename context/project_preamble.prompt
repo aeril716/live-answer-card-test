@@ -1,0 +1,86 @@
+% Live Answer Card — shared project preamble
+% Included at the top of every module prompt in prompts/.
+% This file contains ONLY what the code generator needs: product behavior,
+% frozen interfaces, and code rules. No scheduling, no team or demo strategy.
+
+PRODUCT
+
+A sales call is in progress. When the system hears a technical question it can
+answer from the company's product docs (the `corpus/` directory), it shows the
+answer on a second screen as two or three large keywords the rep can glance at
+and say out loud. Keywords, not sentences.
+
+Two constraints decide everything:
+
+1. SPEED. The end-to-end budget from utterance to rendered card is about
+   3 seconds. An answer that arrives late is worthless.
+2. SILENCE. The system shows nothing unless it is confident. Small talk,
+   pricing, scheduling, and anything it cannot answer well produce the designed
+   empty state. A wrong keyword is much worse than a blank one. Silence is a
+   deliberate output, not a failure.
+
+FROZEN INTERFACES
+
+These signatures and dict keys are frozen. Do not rename them, change
+arguments, or add/remove dict keys, even if a cleaner design is visible.
+
+    audio.get_utterance() -> dict
+        {"text": str, "speaker": "prospect"|"rep"|"unknown", "ts": float}
+
+    trigger.should_fire(utterance: dict) -> dict
+        {"fire": bool, "question": str, "reason": str}
+        reason in {"technical","smalltalk","repeat","not_a_question"}
+
+    retrieval.answer(question: str) -> dict
+        {"keywords": list[str], "detail": str, "source": str, "confidence": float}
+
+    screen.render(card: dict) -> None
+        draws the card; below 0.6 confidence draws the designed empty state
+
+    model_client.fast_complete(prompt: str, max_tokens: int = 200) -> str
+        provider-agnostic; returns "" on any error or timeout
+
+The entry point is app.py, a Streamlit script that owns the polling loop.
+There is no main.py — Streamlit re-runs its script rather than being driven
+from outside.
+
+Only model_client may import a model provider SDK. Every other module calls
+fast_complete(). Modules communicate by direct function call inside one
+process — no database, no HTTP endpoints of our own.
+
+CODE RULES — apply to every generated module
+
+1. A lane function NEVER raises. Wrap the body in try/except, print the error,
+   and return the empty version of the module's contract.
+2. Every module defines USE_MOCK at the top. When True it returns hardcoded
+   data and touches no network. All tests must pass with USE_MOCK = True and
+   no network available.
+3. Every module prints one line per call with its input and key output, in the
+   module's documented log format.
+4. Plain Python. No web framework beyond Streamlit, no async, no class
+   hierarchies, no speculative abstractions.
+5. Every network call sets an explicit timeout at or under its latency budget.
+6. Credentials come from environment variables loaded from .env (see
+   .env.example). Never hardcode a key, never print one, never place one in
+   example code.
+
+LATENCY BUDGETS — every model/network call carries an explicit timeout at or
+below its stage budget; a timeout produces the empty value, never a wait
+
+    mic input -> committed transcript      < 1000 ms
+    fire decision, cheap-path rejection    <   50 ms
+    fire decision, model-classified path   <  400 ms
+    vector search                          <  100 ms
+    keyword generation                     < 1400 ms
+    screen render                          <  100 ms
+    end to end                             < 3000 ms
+
+PRODUCT DECISIONS — fixed, do not revisit
+
+- Confidence threshold for showing a card: 0.6
+- Keywords per card: at most 3 (2–3 typical), each glanceable, not a sentence
+- End-to-end latency budget: ~3 seconds
+- Pricing questions never fire the card; that conversation belongs to the rep.
+- Optimisation target for the fire decision: precision over recall. A missed
+  question is a small loss; a card fired during small talk erodes the rep's
+  trust in the screen. Bias every threshold accordingly.

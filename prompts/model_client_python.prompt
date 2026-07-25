@@ -1,0 +1,56 @@
+% model_client_python.prompt — model_client.fast_complete(), real version
+% Converted from issue #3 (Lane 3). One issue, two modules — this file covers
+% model_client; the classifier lives in trigger_python.prompt.
+
+<include>context/project_preamble.prompt</include>
+
+MODULE
+
+Write `model_client.py`. It exposes `fast_complete(prompt, max_tokens=200)`,
+the one provider-agnostic way the whole project calls a fast model. Keep the
+module under about 60 lines. Swapping or adding a model provider must be a
+`.env` edit, not a code change.
+
+INTERFACE — frozen
+
+    def fast_complete(prompt: str, max_tokens: int = 200) -> str:
+        # Returns the model's text, or "" on any error or timeout.
+
+BEHAVIOR
+
+1. Given `.env` sets `FAST_MODEL_PROVIDER`, `FAST_MODEL_NAME`,
+   `FAST_MODEL_BASE_URL`, and `FAST_MODEL_API_KEY`, when
+   `fast_complete("hi")` is called, then it returns the model's text.
+2. Assume an OpenAI-compatible chat completions endpoint unless configured
+   otherwise.
+3. Given the request times out or errors, when `fast_complete()` is called,
+   then it returns `""` and does not raise.
+4. Given `USE_MOCK = True`, then it returns a canned string with no network
+   access.
+5. Given `FALLBACK_MODEL_NAME` / `FALLBACK_MODEL_BASE_URL` /
+   `FALLBACK_MODEL_API_KEY` are set in `.env`, when the primary provider
+   times out or errors, then it retries once against the fallback and prints
+   which provider actually served the call.
+6. Given the primary provider errors and no fallback is configured, then it
+   returns `""` without retrying — behavior is unchanged from the
+   single-provider case.
+7. Every call prints one line with the prompt length, the provider used, and
+   whether the call succeeded.
+
+MUST NOT
+
+- Must not raise under any circumstance.
+- Must not hardcode a provider, model name, endpoint, or key.
+- Must not print or log any credential.
+- Must not exceed its stage's timeout budget (the classifier path allows
+  400 ms; keyword generation allows 1400 ms — take the timeout as an argument
+  or a module constant, and justify the default in a comment).
+
+VALIDATION
+
+- Test: `pytest tests/test_model_client.py -q` — runs entirely against mocks
+  with no network access, covering: success, timeout returns `""`, error
+  returns `""`, fallback path serves when primary errors, no-fallback path
+  does not retry.
+- Done when: `fast_complete()` works against a configured provider, and every
+  failure mode returns `""` without raising.
