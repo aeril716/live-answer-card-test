@@ -1,49 +1,146 @@
 """
-Module for simulating the retrieval of audio utterances.
-Provides a mock implementation for testing purposes.
+Audio utterance module — mock and real (ElevenLabs Scribe v2 Realtime) paths.
 """
-
-from typing import Dict, Any
+import os
+import time
+import json
+import queue
+import threading
+from typing import Dict, Any, List
 
 USE_MOCK: bool = True
-
 EMPTY: Dict[str, Any] = {"text": "", "speaker": "unknown", "ts": 0.0}
 
-_MOCK_UTTERANCES = [
+_MOCK_UTTERANCES: List[Dict[str, Any]] = [
     {"text": "Are you guys SOC 2 certified?", "speaker": "prospect", "ts": 252.4},
     {"text": "Is that Type I or Type II?", "speaker": "prospect", "ts": 255.1},
-    {"text": "Did you have a good weekend?", "speaker": "prospect", "ts": 260.0},
-    {"text": "How much does it cost?", "speaker": "prospect", "ts": 265.5}
+    {"text": "Do you have any fun plans for the weekend?", "speaker": "prospect", "ts": 260.8},
+    {"text": "How much does the enterprise tier cost?", "speaker": "prospect", "ts": 268.3},
 ]
+_current_index: int = 0
 
-_index: int = 0
+# --- Real path state ---
+_queue: "queue.Queue" = queue.Queue()
+_ws_thread_started: bool = False
+_session_start: float = 0.0
+_benchmark = os.environ.get("AUDIO_BENCHMARK") == "1"
+_pending_send_times: Dict[str, float] = {}
+
+
+def _start_ws_thread() -> None:
+    """Starts the background WebSocket thread exactly once."""
+    global _ws_thread_started, _session_start
+    if _ws_thread_started:
+        return
+    _ws_thread_started = True
+    _session_start = time.time()
+    t = threading.Thread(target=_ws_worker, daemon=True)
+    t.start()
+
+
+def _ws_worker() -> None:
+    """Runs forever in the background: mic capture + WebSocket send/recv,
+    with automatic reconnect on failure. Never raises out of this thread."""
+    import sounddevice as sd
+    import websocket
+
+    api_key = os.environ.get("ELEVENLABS_API_KEY", "")
+    url = "wss://api.elevenlabs.io/v1/speech-to-text/stream"
+
+    while True:
+        try:
+            ws = websocket.create_connection(
+                url,
+                header=[f"xi-api-key: {api_key}"],
+                timeout=5,
+            )
+
+            stop_flag = threading.Event()
+
+            def _on_audio(indata, frames, time_info, status):
+                try:
+                    chunk = indata.tobytes()
+                    ws.send_binary(chunk)
+                    if _benchmark:
+                        _pending_send_times[str(time.time())] = time.time()
+                except Exception:
+                    stop_flag.set()
+
+            stream = sd.RawInputStream(
+                samplerate=16000, channels=1, dtype="int16", callback=_on_audio
+            )
+            stream.start()
+
+            while not stop_flag.is_set():
+                try:
+                    raw = ws.recv()
+                except Exception:
+                    stop_flag.set()
+                    break
+                if not raw:
+                    continue
+                try:
+                    msg = json.loads(raw)
+                except Exception:
+                    continue
+
+                msg_type = msg.get("type", "")
+                if msg_type == "partial_transcript":
+                    continue  # discard partials per spec
+                if msg_type == "committed_transcript":
+                    text = msg.get("text", "")
+                    if not text:
+                        continue
+                    speaker = msg.get("speaker", "unknown") or "unknown"
+                    ts = time.time() - _session_start
+                    _queue.put({"text": text, "speaker": speaker, "ts": ts})
+                    if _benchmark and _pending_send_times:
+                        oldest = min(_pending_send_times.values())
+                        latency_ms = (time.time() - oldest) * 1000
+                        print(f"[audio] benchmark latency_ms={latency_ms:.1f}")
+                        _pending_send_times.clear()
+
+            stream.stop()
+            stream.close()
+            ws.close()
+
+        except Exception as e:
+            print(f"[audio] ws error, reconnecting: {e}")
+
+        time.sleep(1)  # backoff before reconnect
 
 
 def get_utterance() -> Dict[str, Any]:
     """
-    Retrieves the next utterance from the mock data or returns an empty utterance.
-    
-    Returns:
-        Dict[str, Any]: A dictionary containing utterance details (text, speaker, ts).
+    Retrieves the next utterance. Mock path replays a hardcoded list.
+    Real path pops a committed transcript from the streaming queue, or
+    returns EMPTY immediately if none is available.
     """
-    global _index
+    global _current_index
     try:
-        if USE_MOCK and _index < len(_MOCK_UTTERANCES):
-            utterance = _MOCK_UTTERANCES[_index]
-            _index += 1
+        if USE_MOCK:
+            if _current_index < len(_MOCK_UTTERANCES):
+                utterance = _MOCK_UTTERANCES[_current_index]
+                _current_index += 1
+            else:
+                utterance = EMPTY
         else:
-            utterance = EMPTY
-            
+            _start_ws_thread()
+            try:
+                utterance = _queue.get_nowait()
+            except queue.Empty:
+                utterance = EMPTY
+
         print(f"[audio] out={utterance['text']}")
         return utterance
+
     except Exception as e:
-        # Catch unexpected errors to ensure the system gracefully degrades to EMPTY
-        print(f"[error] Failed to get utterance: {e}")
+        print(f"[audio] Error retrieving utterance: {e}")
+        print(f"[audio] out={EMPTY['text']}")
         return EMPTY
 
 
 if __name__ == "__main__":
-    for i in range(1, 7):
-        print(f"--- Call {i} ---")
+    for i in range(6):
         result = get_utterance()
-        print("Returned:", result)
+        print(f"Call {i + 1} result: {result}")
