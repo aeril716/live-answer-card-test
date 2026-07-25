@@ -1,5 +1,41 @@
 services:
+  # Static landing page (Lane 4).
   - name: live-answer-card-landing
     type: web
     runtime: static
     staticPublishPath: ./public
+
+  # The Streamlit app (Lane 4 owns app.py). The build step below builds the
+  # retrieval search index (Lane 1) into the container, so retrieval works the
+  # moment the app starts — no separate job, no manual step.
+  #
+  # Before this service can START, app.py must exist on main (Lane 4). The build
+  # step already works today. API keys are set in the Render dashboard
+  # (Environment tab), never committed — that is what `sync: false` means.
+  - name: live-answer-card
+    type: web
+    runtime: python
+    plan: starter          # a paid instance stays warm for the live demo; well within the $50 credit
+    branch: main           # deploys track main
+    buildCommand: pip install -r requirements.txt && python ingest.py --if-missing
+    startCommand: streamlit run app.py --server.port $PORT --server.address 0.0.0.0
+    envVars:
+      # Primary fast model (required). Set the four values in the dashboard.
+      - key: FAST_MODEL_PROVIDER
+        sync: false
+      - key: FAST_MODEL_NAME
+        sync: false
+      - key: FAST_MODEL_BASE_URL
+        sync: false
+      - key: FAST_MODEL_API_KEY
+        sync: false
+      # Optional fallback provider — set all three if a second provider is used.
+      - key: FALLBACK_MODEL_NAME
+        sync: false
+      - key: FALLBACK_MODEL_BASE_URL
+        sync: false
+      - key: FALLBACK_MODEL_API_KEY
+        sync: false
+      # Optional audio key (Lane 2); the hosted app defaults to typed mode.
+      - key: ELEVENLABS_API_KEY
+        sync: false

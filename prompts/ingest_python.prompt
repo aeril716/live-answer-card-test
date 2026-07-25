@@ -1,0 +1,63 @@
+<pdd-reason>Builds the searchable corpus store and exposes search(); retrieval depends on it.</pdd-reason>
+
+<pdd-interface>
+{
+  "type": "module",
+  "module": {
+    "functions": [
+      {"name": "search", "signature": "(query: str, k: int = 3)", "returns": "list"},
+      {"name": "build_store", "signature": "()", "returns": "int"}
+    ]
+  }
+}
+</pdd-interface>
+
+<include>context/project_preamble.prompt</include>
+
+% Goal
+Turn the six Vantic product docs in `corpus/` into a persisted local store that
+retrieval can search, without ever losing which product a passage is about.
+
+% Role & Scope
+Create root-level `ingest.py`. It does two jobs: a standalone build step that
+compiles `corpus/` into a persisted vector store and exits, and a `search()`
+function the retrieval module imports. It is never invoked from the live app.
+
+% Requirements
+1. Expose `search(query: str, k: int = 3) -> list` where each item is a dict
+   with exactly `{"text", "source", "score"}`. `score` is a similarity in
+   `[0.0, 1.0]`, higher meaning closer. Do not add, rename, or remove keys.
+2. `source` is the filename plus its section number, e.g.
+   `security-overview.md §1.1`. Never emit a chunk without a `source` — an
+   answer that cannot be traced is useless on a live call.
+3. Chunking MUST preserve which product a passage describes. A passage that
+   states Traces retains 90 days, Gateway 7 days, and Evals indefinitely must
+   be retrievable as three distinguishable facts, not one blended chunk;
+   returning the wrong product's fact is the one failure this product cannot
+   make.
+4. `search()` returns the passages most relevant to the query, best first.
+   Ranking quality is judged by the corpus test set, not by a fixed method;
+   explain the retrieval and confidence-scoring approach in the PR, not here.
+5. A standalone run (`python ingest.py`) builds the persisted store from the six
+   docs and exits with a clear per-file summary. The live app never triggers a
+   build; `search()` reads the already-built store. Re-running the build is
+   safe: a deploy/build step can request an idempotent build that no-ops when a
+   non-empty store already exists, and expose whether a store is present.
+6. Given an empty, unreadable, or section-less file, then building skips it,
+   prints one line naming the file, and finishes without raising.
+7. Given an invalid query (non-string or blank) or any internal error, then
+   `search()` returns `[]` and does not raise. An empty list is a safe answer.
+8. When `USE_MOCK` is true, `search()` returns canned results and makes no
+   network call and touches no store, so the module imports and runs offline.
+9. Every `search()` call prints one line in the form
+   `[search] in=<query> out=<result count>`.
+
+% Dependencies
+The preamble supplies the frozen product interfaces and the project-wide code
+rules (never raise, `USE_MOCK`, explicit timeouts, keys from `.env` only).
+The corpus lives in `corpus/*.md`; section headings (`## N`, `### N.M`) define
+the `source` granularity.
+
+% Deliverables
+- Code: `ingest.py`
+- Tests: `tests/test_ingest.py`

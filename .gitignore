@@ -7,3 +7,8 @@ demo_cache.json
 litellm_cache.sqlite
 .rocketride/
 litellm_cache.sqlite/
+
+# PDD Cloud job internals — leak into the checkout instead of staying in the
+# job's isolated /tmp worktree; never meant to be committed.
+.pdd/
+.agentic_prompt_*.txt

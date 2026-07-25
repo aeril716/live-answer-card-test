@@ -8,5 +8,10 @@ requests==2.33.1         # used by model_client for the OpenAI-compatible call
 # app entry point (streamlit run app.py)
 streamlit>=1.30
 
+# live-microphone mode only (audio.py real path, USE_MOCK=False on the local
+# demo laptop). Imported lazily — mock/typed mode never needs these.
+sounddevice>=0.4          # mic capture (needs the OS PortAudio lib at runtime)
+websocket-client>=1.6     # ElevenLabs Scribe realtime stream
+
 # dev / test
 pytest==9.1.1

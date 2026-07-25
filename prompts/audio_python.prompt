@@ -1,67 +1,77 @@
-<pdd-reason>Provides deterministic mock utterances for running the application loop without audio hardware.</pdd-reason>
+% PDD prompt for audio.py — Lane 2, mock + real streaming version
 
-<pdd-interface>
-{
-  "type": "module",
-  "module": {
-    "functions": [
-      {"name": "get_utterance", "signature": "()", "returns": "dict"}
-    ]
-  }
-}
-</pdd-interface>
+Write audio.py, a Python module exposing exactly one function:
+    def get_utterance() -> dict:
 
-% audio_python.prompt — audio.get_utterance(), mock version
+## Mock path (USE_MOCK = True) — this behavior must be preserved exactly
 
-<include>context/project_preamble.prompt</include>
+- A module-level constant USE_MOCK = True at the top of the file.
+- When USE_MOCK is True, get_utterance() replays a hardcoded list of
+  utterances, one per call, and makes no network call.
+- The hardcoded list, in this exact order:
+  1. {"text": "Are you guys SOC 2 certified?", "speaker": "prospect", "ts": 252.4}
+  2. A follow-up utterance asking whether it's Type I or Type II, speaker
+     "prospect", with a later ts.
+  3. A small-talk utterance about the weekend, speaker "prospect", with a
+     later ts.
+  4. A pricing question, speaker "prospect", with a later ts.
+  ts values must strictly increase across the list.
+- Each call to get_utterance() returns the next utterance in the list,
+  advancing an internal index. Each utterance is returned exactly once.
+- Once the list is exhausted, every subsequent call returns
+  EMPTY = {"text": "", "speaker": "unknown", "ts": 0.0}.
+- Include a __main__ block that calls get_utterance() six times and prints
+  each result, so exhaustion of the 4-item list is visible.
 
-% Goal
+## Real path (USE_MOCK = False) — ElevenLabs Scribe v2 Realtime
 
-Create root-level `audio.py` with a deterministic mock `get_utterance()` so the
-application loop runs without audio hardware, a microphone, or a network.
+- On first use, start a background thread that opens a WebSocket connection
+  to wss://api.elevenlabs.io/v1/speech-to-text/stream, authenticating with
+  header xi-api-key set to ELEVENLABS_API_KEY from the environment
+  (use os.environ / python-dotenv).
+- The background thread captures microphone audio using sounddevice and
+  sends it as input_audio_chunk messages over the WebSocket. Use VAD-based
+  automatic commit (not manual commit).
+- The background thread listens for incoming messages. Discard every
+  partial transcript. When a committed transcript arrives, push
+  {"text": <transcript>, "speaker": <diarized label if confidently
+  available, otherwise "unknown">, "ts": <seconds since this session
+  started>} onto a thread-safe queue.Queue.
+- get_utterance() itself never touches the network directly. In the real
+  path it only pops from the queue with a non-blocking get
+  (queue.get_nowait() wrapped in try/except queue.Empty). If the queue is
+  empty, return EMPTY immediately — never block.
+- If the WebSocket connection drops, the background thread must
+  automatically attempt to reconnect with a short backoff, while
+  get_utterance() keeps returning EMPTY (never raises) during the outage.
+- Add an optional benchmark flag via environment variable AUDIO_BENCHMARK.
+  When set to "1", measure and print, in milliseconds, the latency from
+  when an audio chunk is sent to when its corresponding committed
+  transcript is returned by get_utterance().
+- Do not implement any custom sentence-boundary or utterance-splitting
+  logic — treat each committed transcript from the API as one complete
+  utterance.
 
-% Role & Scope
+## Applies to both paths
 
-This module supplies one utterance per synchronous call. This issue implements
-only the in-memory mock; real streaming transcription is out of scope.
+- get_utterance() must return immediately and never block the calling
+  thread in either path.
+- Any internal error (mic unavailable, auth failure, malformed message,
+  connection error, or anything else) must be caught and EMPTY returned —
+  get_utterance() must never raise under any circumstance.
+- The module must print one line per call in the form:
+  [audio] out=<text>
 
-% Requirements
+## Must not
 
-1. Preserve this frozen public interface and EMPTY value:
-       def get_utterance() -> dict: ...
-       EMPTY = {"text": "", "speaker": "unknown", "ts": 0.0}
-2. Given top-level `USE_MOCK = True`, repeated calls return a deterministic
-   four-item in-memory sequence immediately, with no network, device, or audio
-   access.
-3. The first sequence item must equal this frozen dictionary exactly, including
-   its text, speaker, keys, and timestamp:
-       {"text": "Are you guys SOC 2 certified?",
-        "speaker": "prospect",
-        "ts": 252.4}
-4. Each item is returned exactly once and in this order: the frozen first
-   technical question; a follow-up asking Type I or Type II; a small-talk line
-   about the weekend; and a pricing question.
-5. Every remaining sequence item has exactly the keys `text`, `speaker`, and
-   `ts`, uses `speaker="prospect"`, and has a float timestamp strictly greater
-   than the preceding item's timestamp. Every `ts` in the sequence is a float.
-6. Given the fourth item has been returned, every later call returns a fresh
-   EMPTY dictionary. Every sequence result is also fresh so caller mutation
-   cannot alter later results.
-7. Every call returns immediately without blocking or external I/O.
-8. Given any internal failure, return a fresh EMPTY dictionary and raise
-   nothing under any circumstance.
-9. When stdout is available, every call emits exactly one line in the form
-   `[audio] out=<text>`, including an empty suffix after exhaustion. For this
-   module, this single-line contract overrides the shared preamble's separate
-   error diagnostic; stdout failure still returns EMPTY without raising.
-10. Do not import websockets, requests, or any audio library.
-11. Running `python audio.py` executes a guarded `__main__` block that calls
-    `get_utterance()` exactly six times and prints each result. It must run
-    cleanly without a microphone or network and show four ordered utterances
-    followed by two EMPTY results.
+- Must not raise under any circumstance, in either path.
+- Must not block the calling thread.
+- Must not return the same utterance twice.
+- Must not return partial transcripts in the real path.
+- Must not import websockets/requests/sounddevice usage inside the mock
+  path — those imports and their use are confined to the real path only.
 
-% Deliverables
-
-- Code: `audio.py`
-- Example: `context/audio_example.py`
-- Test: `tests/test_audio.py`
+Add sounddevice and websocket-client (or websockets) imports as needed for
+the real path. Keep the file plain — minimal classes are fine only if
+needed for the WebSocket thread/queue management, no unnecessary
+abstraction.
