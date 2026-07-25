@@ -59,45 +59,86 @@ def process_utterance(mods, utterance):
 _CARD_CSS = """
 <style>
 header[data-testid="stHeader"], #MainMenu, footer {display:none;}
-.lac-card{
-  background:#111E42; border:1px solid #243560; border-radius:16px;
-  padding:34px 38px; margin-top:8px;
-}
-.lac-card .kw{
-  font-size:clamp(30px,5.2vw,54px); font-weight:800; line-height:1.18;
-  letter-spacing:.01em; color:#F2F5FB; text-transform:uppercase;
-}
-.lac-card .kw:first-child{color:#FFC94D;}
-.lac-card .det{margin-top:16px; color:#B7BFCF; font-size:15px; line-height:1.5;}
-.lac-card .src{
-  margin-top:8px; color:#8B96B0; font-size:13px;
-  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
-}
-.lac-card.lac-empty{text-align:center; color:#5A6685; padding:44px 38px;}
-.lac-card.lac-empty .dash{font-size:46px; line-height:1;}
-.lac-card.lac-empty .lst{
-  margin-top:10px; font-size:12px; letter-spacing:.18em; text-transform:uppercase;
-}
+.block-container{padding-top:1.4rem; max-width:1000px;}
+.lac{font-family:inherit;}
+.lac .bar{display:flex; align-items:center; gap:14px; padding-bottom:14px;
+  border-bottom:1px solid #243560; margin-bottom:22px;}
+.lac .prod{font-size:15px; font-weight:700; letter-spacing:.14em; color:#4DA3FF;}
+.lac .prod span{color:#8B96B0; font-weight:400; letter-spacing:.02em; margin-left:10px;}
+.lac .liv{margin-left:auto; display:flex; align-items:center; gap:8px;
+  font-size:12px; font-weight:700; letter-spacing:.18em; color:#4DA3FF;}
+.lac .dot{width:9px; height:9px; border-radius:50%; background:#4DA3FF;
+  animation:lacpulse 1.6s infinite;}
+@keyframes lacpulse{0%,100%{opacity:1}50%{opacity:.25}}
+@media (prefers-reduced-motion: reduce){.lac .dot{animation:none}}
+.lac .row{display:flex; gap:16px; align-items:flex-start;}
+.lac .tag{flex:0 0 auto; width:44px; height:44px; border-radius:10px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:22px; font-weight:800;}
+.lac .tag.q{background:#243560; color:#B7BFCF;}
+.lac .tag.a{background:#FFFFFF; color:#0A1430;}
+.lac .qtext{font-size:clamp(20px,3.2vw,30px); font-weight:500; line-height:1.25;
+  color:#B7BFCF; padding-top:5px;}
+.lac .who{display:block; font-size:12px; font-weight:700; letter-spacing:.18em;
+  color:#5A6685; margin-bottom:6px;}
+.lac .arow{margin-top:22px;}
+.lac .chips{display:flex; flex-wrap:wrap; gap:14px;}
+.lac .chip{border:2.5px solid #FFFFFF; background:#16265b; color:#FFFFFF;
+  border-radius:14px; padding:16px 24px;
+  font-size:clamp(26px,4.6vw,44px); font-weight:800; letter-spacing:.01em;
+  box-shadow:0 4px 18px rgba(0,0,0,.35);}
+.lac .drawer{margin-top:18px; border-left:4px solid #FFFFFF; background:#111E42;
+  border-radius:0 12px 12px 0; padding:18px 22px;}
+.lac .drawer p{font-size:clamp(15px,2vw,19px); line-height:1.55; color:#F2F5FB; margin:0;}
+.lac .src{margin-top:12px; font-size:13px; color:#8B96B0;}
+.lac .src b{color:#4DA3FF; font-weight:700;}
+.lac .conf{margin-top:16px; font-size:13px; color:#8B96B0;}
+.lac .conf b{color:#FFC94D; font-weight:800;}
+.lac .nothing{text-align:center; color:#5A6685; padding:48px 0 30px;}
+.lac .nothing .big{font-size:clamp(22px,3.4vw,34px); font-weight:700; letter-spacing:.04em;}
+.lac .nothing .why{margin-top:10px; font-size:14px; letter-spacing:.12em; font-weight:600;}
 </style>
 """
 
 
-def _card_markdown(card):
+def _card_markdown(card, question=""):
     # One single markdown element: st.empty() replaces it atomically, which
-    # avoids ghost fragments from partially-replaced multi-element cards.
-    # Look follows ignore-gameplan.context/live_answer_card_prototype.html.
+    # avoids ghost fragments. Faithful to
+    # ignore-gameplan.context/live_answer_card_prototype.html: header bar with
+    # pulsing LISTENING dot, Q row, white-bordered keyword chips, detail
+    # drawer, and the deliberate "— nothing —" empty state.
     import html as _html
     card = card or {}
     keywords = [str(k) for k in card.get("keywords", [])][:3]
-    if card.get("confidence", 0.0) >= CONFIDENCE_THRESHOLD and keywords:
-        kws = "".join(f'<div class="kw">{_html.escape(k)}</div>' for k in keywords)
+    fired = card.get("confidence", 0.0) >= CONFIDENCE_THRESHOLD and keywords
+
+    head = ('<div class="bar"><span class="prod">VANTIC'
+            '<span>sales support · live</span></span>'
+            '<span class="liv"><span class="dot"></span>LISTENING</span></div>')
+    qrow = ""
+    if question:
+        qrow = ('<div class="row"><div class="tag q">Q</div>'
+                f'<div class="qtext"><span class="who">PROSPECT</span>'
+                f'{_html.escape(question)}</div></div>')
+
+    if fired:
+        chips = "".join(f'<div class="chip">{_html.escape(k)}</div>' for k in keywords)
         detail = _html.escape(card.get("detail", ""))
         source = _html.escape(card.get("source", ""))
-        return (f'<div class="lac-card">{kws}'
-                f'<div class="det">{detail}</div>'
-                f'<div class="src">{source}</div></div>')
-    return ('<div class="lac-card lac-empty"><div class="dash">—</div>'
-            '<div class="lst">listening</div></div>')
+        conf = f"{card.get('confidence', 0.0):.2f}"
+        body = (f'<div class="row arow"><div class="tag a">A</div><div>'
+                f'<div class="chips">{chips}</div>'
+                f'<div class="drawer"><p>{detail}</p>'
+                f'<div class="src">Source: <b>{source}</b></div></div>'
+                f'<div class="conf">CONFIDENCE <b>{conf}</b></div>'
+                f'</div></div>')
+    else:
+        why = ("NOT A TECHNICAL QUESTION · SCREEN STAYS QUIET" if question
+               else "LISTENING FOR A TECHNICAL QUESTION")
+        body = (f'<div class="nothing"><div class="big">— nothing —</div>'
+                f'<div class="why">{why}</div></div>')
+
+    return f'<div class="lac">{head}{qrow}{body}</div>'
 
 
 def _run_app():
@@ -119,7 +160,7 @@ def _run_app():
         if q:
             card = mods["retrieval"].answer(q)
             mods["screen"].render(card)
-            st.markdown(_card_markdown(card), unsafe_allow_html=True)
+            st.markdown(_card_markdown(card, q), unsafe_allow_html=True)
 
     else:  # Live
         col_a, col_b = st.sidebar.columns(2)
@@ -149,9 +190,12 @@ def _run_app():
             card = process_utterance(mods, u)
             if card is not None:
                 mods["screen"].render(card)
-                placeholder.markdown(_card_markdown(card), unsafe_allow_html=True)
+            # redraw on every utterance: silence with the question visible IS
+            # the product argument, so show it rather than freezing the card
+            placeholder.markdown(_card_markdown(card, u.get("text", "")),
+                                 unsafe_allow_html=True)
             if mock_audio:
-                time.sleep(2.0)  # pace the replayed call so cards are watchable
+                time.sleep(2.5)  # pace the replayed call so cards are watchable
 
 
 def _streamlit_active():
