@@ -1,0 +1,52 @@
+[
+  {
+    "gate": {
+      "name": "git-diff-check",
+      "cmd": [
+        "/tmp/pdd_job_raJ2OCPH5mda2m7H9BNu_1eath3a6/.gh-wrapper/git",
+        "diff",
+        "--check",
+        "origin/main...HEAD"
+      ],
+      "source": "git:origin/main...HEAD",
+      "severity": "blocker",
+      "timeout": 60.0,
+      "area": "deterministic-gate",
+      "required_fix_hint": "Run `git diff --check origin/main...HEAD` locally and fix the whitespace/conflict marker issues it reports in the PR diff."
+    },
+    "exit_code": 0,
+    "stdout_excerpt": "",
+    "stderr_excerpt": "",
+    "duration_seconds": 0.004924109000057797,
+    "started_at_iso": "2026-07-25T21:05:21Z",
+    "error": "",
+    "passed": true
+  },
+  {
+    "gate": {
+      "name": "doc-contract",
+      "cmd": [
+        "/opt/venv/bin/python",
+        "-I",
+        "-B",
+        "-c",
+        "import sys, os\n_wt = os.path.realpath(sys.argv[1])\n_cwd = os.path.realpath(os.getcwd())\n_trusted = sys.argv[3] if len(sys.argv) > 3 else ''\nsys.path[:] = [\n    _p for _p in sys.path\n    if _p\n    and os.path.realpath(_p) != _wt\n    and not os.path.realpath(_p).startswith(_wt + os.sep)\n    and os.path.realpath(_p) != _cwd\n]\nif _trusted and os.path.isdir(_trusted):\n    sys.path.insert(0, _trusted)\nfrom pdd.checkup_gates import run_doc_contract_check\nsys.exit(run_doc_contract_check(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else None))",
+        "/tmp/pdd_job_raJ2OCPH5mda2m7H9BNu_1eath3a6/.pdd/worktrees/change-issue-14",
+        "",
+        "/opt/venv/lib/python3.12/site-packages"
+      ],
+      "source": "README.md",
+      "severity": "blocker",
+      "timeout": 60.0,
+      "area": "deterministic-gate",
+      "required_fix_hint": "Verify that all added user-facing surfaces (CLI options, skip behaviors, environment variables, and .pddrc keys) are fully documented."
+    },
+    "exit_code": 0,
+    "stdout_excerpt": "Doc Contract Check: Passed.\n",
+    "stderr_excerpt": "",
+    "duration_seconds": 5.288405304999969,
+    "started_at_iso": "2026-07-25T21:05:21Z",
+    "error": "",
+    "passed": true
+  }
+]
