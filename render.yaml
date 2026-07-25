@@ -1,5 +1,5 @@
 services:
-  - type: static_site
-    name: live-answer-card-landing
-    buildCommand: ""
+  - name: live-answer-card-landing
+    type: web
+    runtime: static
     staticPublishPath: ./public
