@@ -164,6 +164,13 @@ def _run_app():
             st.markdown(_card_markdown(card, q), unsafe_allow_html=True)
 
     else:  # Live
+        if getattr(mods["audio"], "USE_MOCK", True):
+            st.sidebar.info(
+                "This hosted demo replays a scripted call — a cloud server has "
+                "no microphone. For real audio, run it on your own laptop: "
+                "`scripts/run_local_live.sh`, then open "
+                "[localhost:8501](http://localhost:8501)."
+            )
         col_a, col_b = st.sidebar.columns(2)
         if col_a.button("Start"):
             if getattr(mods["audio"], "USE_MOCK", False):
