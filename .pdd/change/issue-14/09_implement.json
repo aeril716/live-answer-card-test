@@ -1,0 +1,13 @@
+{
+  "status": "changed",
+  "files_modified": [
+    "README.md",
+    "docs/writing-pdd-prompts.md"
+  ],
+  "files_created": [
+    "prompts/audio_python.prompt"
+  ],
+  "direct_edits": [],
+  "manual_review": [],
+  "error": ""
+}

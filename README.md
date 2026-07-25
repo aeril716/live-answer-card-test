@@ -17,6 +17,25 @@ Each call also prints `[screen] in=conf=<confidence> out=<rendered|empty>` for
 the end-to-end demo trace. Streamlit rendering is intentionally out of scope for
 this version.
 
+## Mock audio input
+
+`audio.get_utterance()` provides deterministic, microphone-free input for the
+application loop. With `USE_MOCK = True`, successive calls return four
+hardcoded prospect utterances once each, in order, and then return:
+
+```python
+{"text": "", "speaker": "unknown", "ts": 0.0}
+```
+
+The mock performs no network or audio-device work. Run its six-call exhaustion
+demo with:
+
+```sh
+python audio.py
+```
+
+Each call prints `[audio] out=<text>`.
+
 ## Decision layer
 
 `trigger.should_fire(utterance)` decides whether an utterance should produce a

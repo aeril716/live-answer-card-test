@@ -1,0 +1,67 @@
+<pdd-reason>Provides deterministic mock utterances for running the application loop without audio hardware.</pdd-reason>
+
+<pdd-interface>
+{
+  "type": "module",
+  "module": {
+    "functions": [
+      {"name": "get_utterance", "signature": "()", "returns": "dict"}
+    ]
+  }
+}
+</pdd-interface>
+
+% audio_python.prompt — audio.get_utterance(), mock version
+
+<include>context/project_preamble.prompt</include>
+
+% Goal
+
+Create root-level `audio.py` with a deterministic mock `get_utterance()` so the
+application loop runs without audio hardware, a microphone, or a network.
+
+% Role & Scope
+
+This module supplies one utterance per synchronous call. This issue implements
+only the in-memory mock; real streaming transcription is out of scope.
+
+% Requirements
+
+1. Preserve this frozen public interface and EMPTY value:
+       def get_utterance() -> dict: ...
+       EMPTY = {"text": "", "speaker": "unknown", "ts": 0.0}
+2. Given top-level `USE_MOCK = True`, repeated calls return a deterministic
+   four-item in-memory sequence immediately, with no network, device, or audio
+   access.
+3. The first sequence item must equal this frozen dictionary exactly, including
+   its text, speaker, keys, and timestamp:
+       {"text": "Are you guys SOC 2 certified?",
+        "speaker": "prospect",
+        "ts": 252.4}
+4. Each item is returned exactly once and in this order: the frozen first
+   technical question; a follow-up asking Type I or Type II; a small-talk line
+   about the weekend; and a pricing question.
+5. Every remaining sequence item has exactly the keys `text`, `speaker`, and
+   `ts`, uses `speaker="prospect"`, and has a float timestamp strictly greater
+   than the preceding item's timestamp. Every `ts` in the sequence is a float.
+6. Given the fourth item has been returned, every later call returns a fresh
+   EMPTY dictionary. Every sequence result is also fresh so caller mutation
+   cannot alter later results.
+7. Every call returns immediately without blocking or external I/O.
+8. Given any internal failure, return a fresh EMPTY dictionary and raise
+   nothing under any circumstance.
+9. When stdout is available, every call emits exactly one line in the form
+   `[audio] out=<text>`, including an empty suffix after exhaustion. For this
+   module, this single-line contract overrides the shared preamble's separate
+   error diagnostic; stdout failure still returns EMPTY without raising.
+10. Do not import websockets, requests, or any audio library.
+11. Running `python audio.py` executes a guarded `__main__` block that calls
+    `get_utterance()` exactly six times and prints each result. It must run
+    cleanly without a microphone or network and show four ordered utterances
+    followed by two EMPTY results.
+
+% Deliverables
+
+- Code: `audio.py`
+- Example: `context/audio_example.py`
+- Test: `tests/test_audio.py`
