@@ -1,0 +1,26 @@
+gate: doc-contract
+cmd: /opt/venv/bin/python -I -B -c import sys, os
+_wt = os.path.realpath(sys.argv[1])
+_cwd = os.path.realpath(os.getcwd())
+_trusted = sys.argv[3] if len(sys.argv) > 3 else ''
+sys.path[:] = [
+    _p for _p in sys.path
+    if _p
+    and os.path.realpath(_p) != _wt
+    and not os.path.realpath(_p).startswith(_wt + os.sep)
+    and os.path.realpath(_p) != _cwd
+]
+if _trusted and os.path.isdir(_trusted):
+    sys.path.insert(0, _trusted)
+from pdd.checkup_gates import run_doc_contract_check
+sys.exit(run_doc_contract_check(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else None)) /tmp/pdd_job_uWKbaZhTe0LSqyc4PtKe_oy3dm84v/.pdd/worktrees/change-issue-10  /opt/venv/lib/python3.12/site-packages
+source: README.md
+started: 2026-07-25T20:20:17Z
+duration_seconds: 5.334
+exit_code: 0
+
+---- stdout ----
+Doc Contract Check: Passed.
+
+---- stderr ----
+

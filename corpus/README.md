@@ -115,6 +115,16 @@ The pricing one matters most. It is a real, answerable, document-backed question
 that we deliberately stay silent on, because pricing is the rep's conversation to
 have. If the card fires on pricing, the "we decide" claim weakens.
 
+Repeat classification is scoped to one sales call: the first technical question
+fires and is recorded immediately, a reworded repeat does not fire, and
+`trigger.reset_call()` clears that history for the next call. This intentionally
+treats “fired” as “answered”; if retrieval or display later fails, the question
+still remains suppressed because avoiding duplicate cards takes priority.
+
+Utterances labelled `rep` never fire. `prospect` and `unknown` utterances are
+classified by content, and a prospect's technical question still fires when it
+is addressed to the rep's colleague.
+
 ---
 
 ## Demo script (3 minutes)

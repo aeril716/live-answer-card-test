@@ -24,8 +24,8 @@ context/
 prompts/
   _TEMPLATE_module_python.prompt
   retrieval_python.prompt      # reference conversion — copy its shape
-  trigger_python.prompt        # Lane 3, converted from issue #3
-  model_client_python.prompt   # Lane 3, converted from issue #3
+  trigger_python.prompt        # Lane 3, converted from issue #10
+  model_client_python.prompt   # Lane 3, converted from issue #10
   band_python.prompt           # Lane 3, converted from issue #5 (optional feature)
 docs/
   writing-pdd-prompts.md       # this file
@@ -34,15 +34,17 @@ docs/
 - Naming: `<module>_<language>.prompt`, e.g. `retrieval_python.prompt`. One
   prompt per module. A later real version **replaces** the mock prompt in
   place — same file, same interface — it does not get a new file.
-- **One prompt per module, even when one issue covers two.** Issue #3 (Lane 3)
+- **One prompt per module, even when one issue covers two.** Issue #10 (Lane 3)
   specifies both `trigger.py` and `model_client.py`; it became two prompt
-  files that cross-reference each other in their header comments.
-- Every prompt starts with
-  `<include>context/project_preamble.prompt</include>`. The preamble owns the
-  product description, the five frozen interfaces, and the code rules, so no
-  prompt restates them and no two prompts can drift apart. If your PDD setup
-  does not resolve `<include>`, paste the preamble's content at the top of the
-  prompt instead — but keep the single source of truth in `context/`.
+  files. The trigger prompt declares the one-way architectural relationship
+  with `<pdd-dependency>model_client_python.prompt</pdd-dependency>`.
+- Every prompt includes
+  `<include>context/project_preamble.prompt</include>` after any leading
+  `<pdd-*>` architecture metadata. The preamble owns the product description,
+  the five frozen interfaces, and the code rules, so no prompt restates them
+  and no two prompts can drift apart. If your PDD setup does not resolve
+  `<include>`, paste the preamble's content after the metadata instead — but
+  keep the single source of truth in `context/`.
 
 ## Converting an issue: keep / strip
 
@@ -83,7 +85,7 @@ the motive:
 > "Given any other question, then EMPTY is returned — the empty state must be
 > reachable."
 
-Issue #3 has the sharpest examples. "This is the module the judges are
+Issue #10 has the sharpest examples. "This is the module the judges are
 actually evaluating" and "the claim we are making on stage" were dropped
 entirely. "mem0 is a hackathon sponsor" became a bare `USE_MEM0` flag
 requirement. But "sponsor rate limits sometimes arrive late" was **not** just

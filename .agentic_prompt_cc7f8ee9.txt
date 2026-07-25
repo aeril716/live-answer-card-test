@@ -1,0 +1,734 @@
+% You are an expert software engineer. Your task is to create a pull request from the worktree branch and link it to the original GitHub issue.
+
+% Context
+
+You are working on step 13 of 13 in an agentic change workflow. This is the final step. All prompt changes have been made and verified. Now you create a PR for review.
+
+% Inputs
+
+- GitHub Issue URL: https://github.com/aeril716/live-answer-card-test/issues/10
+- Repository: aeril716/live-answer-card-test
+- Issue Number: 10
+- Issue Title: [Lane 3] trigger.should_fire() + model_client — the decision layer
+- Worktree Path: /tmp/pdd_job_uWKbaZhTe0LSqyc4PtKe_oy3dm84v/.pdd/worktrees/change-issue-10
+- Artifacts Directory: /tmp/pdd_job_uWKbaZhTe0LSqyc4PtKe_oy3dm84v/.pdd/worktrees/change-issue-10/.pdd/change/issue-10
+- Branch Name: change/issue-10
+- Base Branch: main
+- Files Changed: prompts/model_client_python.prompt, prompts/trigger_python.prompt, README.md, .env.example, corpus/README.md
+- Sync Order Script: /tmp/pdd_job_uWKbaZhTe0LSqyc4PtKe_oy3dm84v/.pdd/sync_order_change.sh
+- Sync Order Commands: pdd sync trigger
+pdd sync model_client
+- Clean Restart Mode: false
+
+% Issue Content
+<issue_content>
+Title: [Lane 3] trigger.should_fire() + model_client — the decision layer
+
+Description:
+## Goal
+
+`trigger.should_fire(utterance)` decides whether the screen shows anything at
+all, correctly classifying technical questions, small talk, repeats, and
+non-questions. And `model_client.fast_complete()` gives the whole project one
+provider-agnostic way to call a fast model.
+
+## Context
+
+This is the module the judges are actually evaluating. The claim we are making
+on stage is "we designed a system rather than calling an LLM," and this module
+is the entire evidence for that claim. Everything else is plumbing around it.
+
+**Build `model_client.py` first** — Lane 1 cannot start real work without it.
+Keep it under about 60 lines. It exists so that swapping or adding model
+providers at the event is a `.env` edit rather than a code change, which matters
+because sponsor rate limits and credits sometimes arrive late or not at all.
+
+It should also support an optional secondary provider. If `FALLBACK_MODEL_*` is
+set in `.env`, retry once against it when the primary times out or errors, and
+print which provider actually served the call. If it isn't set, behave exactly
+as before. Two providers configured means one provider going down or rate
+limiting us does not stop the demo.
+
+Then the classifier. Four decisions, in this order:
+
+1. **Is this a question at all?** Statements and back-channel ("mm-hmm",
+   "right", "gotcha") never fire.
+2. **Is it technical or spec-related?** Pricing, scheduling, and small talk
+   never fire, even when phrased as questions.
+3. **Have we already answered this on this call?** Re-firing the same card is
+   worse than never firing — it turns the screen into noise, and the rep stops
+   trusting it.
+4. **Is it phrased well enough for retrieval?** If not, rewrite it into a clean
+   question string in the `question` field.
+
+Do the cheap checks before the expensive one. Decisions 1 and 3 should mostly
+resolve without a model call at all, which saves latency on every line of small
+talk — and most of a sales call is small talk.
+
+## Acceptance criteria
+
+**model_client**
+
+1. Given `.env` sets provider, model, base URL and key, when
+   `fast_complete("hi")` is called, then it returns the model's text.
+2. Given the request times out or errors, when `fast_complete()` is called, then
+   it returns `""` and does not raise.
+3. Given `USE_MOCK = True`, then it returns a canned string with no network
+   access.
+4. Given the primary provider errors and a fallback is configured, when
+   `fast_complete()` is called, then the fallback serves it and the provider
+   used is printed.
+5. Given the primary provider errors and no fallback is configured, then it
+   returns `""` without retrying.
+
+**trigger**
+
+6. Given the utterance "Are you SOC 2 certified?", when `should_fire()` is
+   called, then `fire` is True and `reason` is `"technical"`.
+7. Given the utterance "How was your weekend?", when `should_fire()` is called,
+   then `fire` is False and `reason` is `"smalltalk"`.
+8. Given the utterance "How much does the enterprise tier cost?", when
+   `should_fire()` is called, then `fire` is False — pricing is not technical.
+9. Given a question already answered earlier in the same call, when it is asked
+   again in different words, then `fire` is False and `reason` is `"repeat"`.
+10. Given "mm-hmm", when `should_fire()` is called, then `fire` is False and
+   `reason` is `"not_a_question"`, with no model call made.
+11. Given the model returns malformed JSON, when `should_fire()` is called, then
+   it returns EMPTY and does not raise.
+12. Given a 20-sentence labelled test set, when it is run, then at least 18
+    sentences classify correctly and **no small-talk sentence fires**.
+
+## Must not
+
+- Must not raise under any circumstance — catch and return EMPTY.
+- Must not fire on pricing, scheduling, or small talk.
+- Must not fire twice for the same question within one call.
+- Must not make a model call for back-channel or obvious non-questions.
+- Must not accept a model response wrapped in markdown fences or preamble —
+  parse strictly, fail to EMPTY.
+
+## Optimisation target — state this in the PR too
+
+**Precision over recall.** A missed question is a small loss. A card that fires
+during small talk destroys the demo and the argument behind it. Bias every
+threshold accordingly, and say in a code comment exactly where that bias lives,
+so it can be moved during rehearsal without hunting.
+
+## Repeat detection
+
+Start with the simple version: a list of answered questions for this call plus a
+similarity check. Explain the tradeoff of the approach chosen.
+
+Then, behind a `USE_MEM0` flag, show what it takes to back this with **mem0**
+instead. mem0 is a hackathon sponsor and this is the one place in our system
+where a real memory layer is genuinely the right tool rather than decoration.
+The simple version stays as the fallback and remains the default.
+
+## Validation
+
+- Test: `pytest tests/test_trigger.py -q` — the 20-sentence labelled set,
+  running entirely against mocks with no network access.
+- The test set must include the hard cases: a technical question buried in small
+  talk, the same question asked twice in different words, and a question
+  addressed to the rep's colleague rather than to us.
+- A debug mode that prints, per sentence, which of the four decisions stopped it
+  and why. Needed for tuning, and for explaining the system on stage.
+
+## Done when
+
+- `model_client.py` works and Lane 1 is unblocked
+- The 20-sentence test set passes at 18/20 or better
+- Zero small-talk sentences fire — this is a hard gate, not a target
+- The debug output makes every decision explainable in one line
+
+Comments:
+
+--- Comment by prompt-driven-github[bot] ---
+🚀 **Job Queued!**
+
+Job ID: `A0dG9BdOOVPqzlanf63J`
+Triggered by: @aeril716
+Label: `pdd-change`
+
+[View Live Progress](https://promptdriven.ai/jobs/A0dG9BdOOVPqzlanf63J)
+
+Budget cap: none
+
+You can add or change a cap by commenting:
+```text
+/strength 0.7
+/pdd budget N
+/pdd settings
+/pdd stop
+```
+_Run controls require write access; `/pdd settings` is read-only._
+
+--- Comment by prompt-driven-github[bot] ---
+<!-- PDD_WORKFLOW_STATE:change:issue-10
+{{
+  "step_outputs": {{
+    "1": "<step_report>\n## Step 1: Duplicate Check\n\n**Status:** No duplicates found\n\n### Search Performed\n- Searched for: `trigger should_fire`, `model_client fast_complete`, `repeat detection smalltalk`, `fallback provider`, `decision layer`\n- Issues reviewed: 6\n\n### Findings\nNo other issue requests the same change. Targeted searches returned only #10. The broad `decision layer` search also returned closed issue #4, but #4 implements the separate terminal `screen.render(card)` presentation layer; it does not request question classification, repeat detection, or a provider-agnostic model client. Open issue #8 concerns corpus ingestion and vector search, another adjacent but distinct pipeline component. This appears to be a new change request.\n\n---\n*Proceeding to Step 2: Documentation Check*\n</step_report>",
+    "2": "<step_report>\n## Step 2: Documentation Check\n\n**Status:** Not Implemented\n\n### Documentation Reviewed\n- `README.md` (currently documents only the terminal support screen)\n- `.env.example` (primary fast-model variables only)\n- `docs/writing-pdd-prompts.md` (prompt-authoring guidance)\n- `context/project_preamble.prompt` (frozen `should_fire` and `fast_complete` interfaces)\n- `prompts/trigger_python.prompt` (requested classifier specification)\n- `prompts/model_client_python.prompt` (requested provider-client specification)\n- `corpus/README.md` (example trigger classifications)\n- Repository source and test tree, including searches for `should_fire`, `fast_complete`, fallback configuration, repeat detection, and mem0\n- `CONTRIBUTING.md` and API/usage documentation (not present)\n\n### Findings\nThe requested behavior is documented as a generation specification in the two prompt files, but it is not implemented or available for use. The repository contains no `trigger.py`, `model_client.py`, or `tests/` directory. The README provides no usage instructions for either API, and `.env.example` defines only the primary `FAST_MODEL_*` variables; it does not document `FALLBACK_MODEL_*`, `USE_MEM0`, or debug configuration. The corpus gives expected classification examples but no executable classifier. Therefore, there is no existing documented approach that achieves the issue's goal.\n\n---\n*Proceeding to Step 3: Identify Dev Units*\n</step_report>",
+    "3": "<step_report>\n## Step 3: Research & Clarification\n\n**Status:** Additional Questions Identified\n\n### Summary\nResearch focused on OpenAI-compatible provider failover, strict JSON handling, local semantic-repeat heuristics, and the current mem0 Python API. The requested architecture is sound, but call lifecycle and \u201canswered\u201d state are not representable through the frozen `should_fire(utterance)` interface and need clarification before implementation.\n\n### Research Findings\n\n#### Technical Background\n- The official OpenAI Python client supports `api_key`, `base_url`, explicit `timeout`, and `max_retries`. Its current release is **2.45.0** (July 9, 2026); it retries connection errors, HTTP 408/409/429, and 5xx responses twice by default, and its default timeout is ten minutes. This feature must therefore set `timeout <= 0.4s` and `max_retries=0`, or the SDK's implicit retries can consume the classifier budget before application-level fallback runs. The issue should not pin a model ID: the model is intentionally environment-configured and available IDs vary by provider/account. [Official OpenAI Python SDK](https://github.com/openai/openai-python)\n- OpenAI-compatible chat completions are a practical thin abstraction when both endpoints implement the same wire protocol. Construct one client per configured endpoint, call `chat.completions.create(...)`, and read `choices[0].message.content`; provider-specific behavior should remain confined to `model_client.py`.\n- Python's `json.loads()`/`JSONDecoder.decode()` rejects trailing non-whitespace data, which satisfies the \u201cno fences or preamble\u201d rule. Parsing must additionally validate the exact object shape and types because syntactically valid JSON can still violate the contract. Python's decoder accepts non-standard `NaN`/`Infinity` by default, so `parse_constant` should reject them if numeric fields are ever allowed. [Python `json` documentation](https://docs.python.org/3.13/library/json.html)\n- `difflib.SequenceMatcher` is lexical, not semantic. It can cheaply catch normalized duplicates and close rephrasings, but paraphrases with different vocabulary may be missed. Its score can depend on argument order and worst-case runtime is quadratic; compare short, normalized token sequences with `autojunk=False` and use a deliberately conservative, test-tuned threshold. [Python `difflib` documentation](https://docs.python.org/3.12/library/difflib.html)\n- Current mem0 OSS usage installs `mem0ai`, requires Python 3.10+, initializes `Memory`, adds messages with `add(...)`, and searches with `search(query, filters={{...}})`. Defaults include an LLM, embeddings, Qdrant, and SQLite, so it is not a cheap or network-free substitute for the local list. Current Python SDK release notes show **v2.0.3** (May 26, 2026), and entity scoping belongs in `filters`; a unique call/run ID is essential to prevent cross-call repeat matches. [Mem0 Python quickstart](https://docs.mem0.ai/open-source/python-quickstart), [Mem0 releases](https://github.com/mem0ai/mem0/releases)\n\n#### Best Practices\n- Keep cheap deterministic gates first: reject empty/non-string text, known backchannels, obvious statements, and non-prospect speech where product policy requires it. Normalize with Unicode case-folding, whitespace collapse, and punctuation removal before exact-repeat comparison.\n- Use one bounded primary attempt and, only on any primary failure, one bounded fallback attempt. Disable SDK retries so \u201conce\u201d is literal. The total primary-plus-fallback duration still needs to fit the 400 ms classifier budget; two independent 400 ms attempts would violate it.\n- Treat missing/partial fallback configuration as \u201cfallback disabled.\u201d Log only a safe provider label, prompt length, and success; never log keys, full URLs containing credentials, prompts, or exception payloads that may echo secrets.\n- Prefer precision by using deterministic deny lists/categories for pricing, scheduling, and small talk, then require an affirmative technical classification. Validate model output against an exact allow-list and fail closed to `EMPTY`.\n- Separate debug detail from mandatory one-line operational output. Debug output should name the stopping stage (`question`, `domain`, `repeat`, or `rewrite`) without exposing credentials or uncontrolled model text.\n- Tests should monkeypatch the SDK/client boundary and assert call counts, configured timeouts, disabled retries, fallback ordering, strict parsing, no-network mock behavior, and state isolation between calls.\n\n#### Similar Implementations\n- LiteLLM offers a unified `completion()` API and routing/fallback features, but it is a much larger dependency than the requested roughly 60-line adapter. For two OpenAI-compatible endpoints, the official OpenAI client plus a small loop better matches the repository's \u201cplain Python/no speculative abstractions\u201d constraint. [LiteLLM documentation](https://docs.litellm.ai/)\n- mem0 provides the sponsored memory-layer alternative, while the local normalized list plus `SequenceMatcher` is the appropriate default: deterministic, fast, offline-testable, and dependency-light. mem0 should be lazily imported/initialized only when enabled and must fail back to the local implementation.\n\n#### Security/Edge Cases\n- Model output is untrusted input. Do not strip fences, search for a JSON substring, or accept a prefixed/suffixed object; parse the entire response and enforce exact keys/types/allowed reasons. Limit utterance and response sizes to avoid pathological latency/memory use.\n- Prompt injection embedded in an utterance can ask the classifier to change labels or emit malformed output. Delimit the utterance as data, give a fixed schema and category rules, and fail closed. The deny rules should run outside the model where possible.\n- Global repeat state can leak between tests, users, or calls, and Streamlit reruns can either unexpectedly preserve cached module state or erase plain state. A call-scoped identifier/reset mechanism is required.\n- `speaker=\"rep\"` and `\"unknown\"` semantics are unspecified. The validation explicitly includes a question addressed to the rep's colleague, but does not say whether that means a prospect's question should fire regardless of addressee, or a colleague/rep utterance should be suppressed.\n- An empty string, whitespace, non-dict input, absent/non-string `text`, excessively long text, incomplete credentials, `None` model content, malformed response objects, mem0 import/config/search failures, and logging failures must all return the frozen empty value without raising.\n\n### Refined Specifications\nBased on the research, here are clarified requirements:\n1. Preserve the frozen public signatures. Internally set the OpenAI client to `max_retries=0`; allocate explicit primary and fallback timeouts from one total budget no greater than 400 ms, and make fallback active only when all required fallback fields are non-empty.\n2. `USE_MOCK` must be checked before client construction or mem0 initialization. Tests must prove zero network/client calls in mock mode. Add `FALLBACK_MODEL_PROVIDER` to `.env.example` if provider identity is required; otherwise define the printable provider as the configured model name or sanitized base-URL host.\n3. Normalize short questions and keep answered questions in call-scoped state. Exact normalized equality is always a repeat; a high, clearly named `SequenceMatcher(..., autojunk=False)` threshold implements conservative fuzzy matching. Document that this favors speed and precision but may miss semantically equivalent paraphrases.\n4. Use mem0 only behind `USE_MEM0=False`, lazy-load it, scope every add/search by a unique call/run filter, apply a high search-score threshold, and fall back to the local list on every mem0 failure. Do not pin mem0 merely from \u201clatest\u201d; pin/test the chosen release when implementation begins.\n5. Accept only a complete JSON object with exactly `fire`, `question`, and `reason`; enforce boolean/string types, the reason allow-list, consistent combinations (`technical` is the only firing reason), and no markdown/preamble/trailing content. Any discrepancy returns a fresh copy of `EMPTY`.\n6. The 20-case test corpus should distinguish classification accuracy from the zero-small-talk hard gate and include pricing, scheduling, backchannels, statements containing `?`, indirect/embedded technical questions, adversarial instructions, paraphrased repeats, speaker cases, malformed JSON, and call-state reset.\n\n### Questions for Step 4 Clarification Review\n1. What marks the start/end of a sales call and resets repeat memory? May the implementation add a reset helper or consume an optional call ID from the utterance, despite the frozen utterance keys?\n2. When is a question added to \u201canswered\u201d memory? `should_fire()` only decides to fire and receives no callback confirming that retrieval produced/displayed an answer. Should it mean \u201cpreviously fired,\u201d or may another module acknowledge a successfully answered question?\n3. Must primary plus fallback complete within a single 400 ms total budget? If so, what split is desired (for example 200 ms each), since two 400 ms attempts violate the stage budget?\n4. Is `FALLBACK_MODEL_PROVIDER` a required new variable, and what exactly should \u201cprovider used\u201d print when only the documented fallback name/base URL/key are configured?\n5. Should questions spoken by `rep` or `unknown` be suppressed, and how should the \u201caddressed to the rep's colleague rather than to us\u201d hard case be labelled?\n6. The written decision order places domain classification before repeat detection, while also saying decisions 1 and 3 should mostly avoid model calls. Should repeat detection run before the domain model call after the question gate, or is the numbered order absolute?\n\n### Why This Matters\nWithout explicit lifecycle and acknowledgment semantics, repeat state will either leak across calls or incorrectly mark questions that fired but were never answered. Timeout and provider-label answers determine whether fallback meets the latency/logging acceptance criteria, while speaker and decision-order answers change expected classifications and model-call counts.\n\n### Alternative Approaches Considered\n- **Official OpenAI client with a small endpoint loop:** Minimal code and dependencies, direct timeout/retry control, and sufficient for OpenAI-compatible providers; it does not adapt non-compatible provider schemas.\n- **LiteLLM router:** Broad provider support and built-in fallback, but adds significant dependency/configuration surface for a two-provider, roughly 60-line module.\n- **Local lexical similarity:** Fast, deterministic, offline, and easy to explain; misses vocabulary-changing paraphrases and needs threshold tuning.\n- **Embeddings or mem0 as the default:** Better semantic recall and persistence, but adds latency, cost, external failure modes, state-cleanup concerns, and conflicts with the required simple default.\n\n### Recommended Approach\nImplement the official OpenAI-compatible client as a small, dependency-injected adapter with SDK retries disabled and one shared latency budget. Build the trigger as fail-closed deterministic gates plus one strict-JSON classification/rewrite call, with normalized call-scoped local repeat memory and optional lazily loaded mem0 using the same call scope. Resolve the six lifecycle, timeout, logging, speaker, and ordering questions in Step 4 before fixing tests or state APIs.\n\n---\n*Forwarding questions to Step 4: Requirements Clarity Check*\n</step_report>",
+    "4": "<step_report>\n## Step 4: Requirements Clarity Check\n\n**Status:** Clarification Needed\n\n### Clarity Assessment\n| Aspect | Status |\n|--------|--------|\n| Problem statement | :white_check_mark: Clear |\n| Expected outcomes | :warning: Mostly defined, with repeat and speaker semantics unresolved |\n| Scope | :white_check_mark: Bounded |\n| Edge cases | :warning: Extensive, but call lifecycle and speaker handling are undefined |\n\n### What's Clear\nThe change should add a small provider-agnostic model client with one optional fallback, plus a precision-first, fail-closed trigger classifier. Deterministic checks must suppress obvious non-questions, pricing, scheduling, and small talk; model JSON must be parsed strictly; repeat detection defaults to local memory with optional mem0; and offline tests must achieve at least 18/20 with zero small-talk fires.\n\n### Questions for @aeril716\n\nTo proceed with implementation, I need clarification on the following:\n\n1. **Repeat-memory lifecycle and the meaning of \u201canswered\u201d**\n\n   `should_fire(utterance)` has no call ID and receives no confirmation that a displayed card was successfully answered. Without an explicit lifecycle, repeat state can leak between sales calls; without an acknowledgement rule, a failed retrieval may incorrectly suppress a later question.\n\n   **Options:**\n   - **A) Treat \u201cfired\u201d as \u201canswered\u201d and add an explicit `reset_call()` helper**: Record a question when `should_fire()` returns `fire=True`; the caller resets memory at the beginning of each call.\n     - Implications: Smallest implementation and preserves the frozen `should_fire(utterance)` signature, but a card that fails downstream still counts as answered.\n   - **B) Add a call ID to each utterance and treat \u201cfired\u201d as \u201canswered\u201d**: Scope local and mem0 records by that ID.\n     - Implications: Strong call isolation, but changes the accepted utterance contract and requires every caller to supply an ID.\n   - **C) Add explicit lifecycle and acknowledgement helpers**: Start/reset a call, and record a question only after retrieval/display confirms an answer.\n     - Implications: Most accurate semantics, but adds integration work and public API beyond the two requested functions.\n\n   **Recommendation:** **A**, because it is simple, testable, and compatible with the frozen interface. The downstream limitation can be documented.\n\n2. **Order of repeat detection and model-based domain classification**\n\n   The numbered decisions put technical/domain classification before repeat detection, but the latency guidance says repeat detection should usually avoid a model call. Those instructions lead to different call counts for repeated questions.\n\n   **Options:**\n   - **A) Run `question \u2192 repeat \u2192 domain/rewrite`**: Check local or mem0 repeat state immediately after the cheap question gate.\n     - Implications: Repeats avoid model latency and cost; debug output still identifies the repeat gate, but the numbered order changes.\n   - **B) Keep the numbered order `question \u2192 domain \u2192 repeat \u2192 rewrite`**: Classify the domain before checking repeat state.\n     - Implications: Matches the stated order exactly, but every paraphrased repeat may make a model call.\n\n   **Recommendation:** **A**, because it directly satisfies the stated optimization that repeat detection should mostly resolve without a model call.\n\n3. **Speaker and addressee policy**\n\n   The validation set must include a question addressed to the rep\u2019s colleague, but its expected label is not stated. It is also unclear whether utterances marked as spoken by the rep or with an unknown speaker should be eligible to fire.\n\n   **Options:**\n   - **A) Classify all speakers by content; a technical prospect question fires regardless of whom it addresses**.\n     - Implications: Simple and robust when diarization is unreliable, but the rep\u2019s own technical questions can trigger cards.\n   - **B) Suppress `rep`; classify `prospect` and `unknown`; a prospect\u2019s technical question fires even when addressed to a colleague**.\n     - Implications: Prevents self-triggering while tolerating unknown diarization and preserves useful technical questions based on content.\n   - **C) Fire only for questions explicitly addressed to the rep/system by a confirmed prospect**.\n     - Implications: Highest precision, but requires addressee inference and may miss useful questions addressed indirectly or tagged `unknown`.\n\n   **Recommendation:** **B**, as the best precision-first balance without making addressee inference another unreliable model task.\n\n### Next Steps\nPlease reply with your preferred options (e.g., \"1A, 2A, 3B\"). Then run `pdd change https://github.com/aeril716/live-answer-card-test/issues/10` again to continue.\n\n---\n*Workflow paused - awaiting clarification from @aeril716*\n</step_report>\n\nSTOP_CONDITION: Clarification needed"
+  }},
+  "issue_updated_at": "2026-07-25T19:46:09Z",
+  "last_completed_step": 3,
+  "step_comments": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "step_json_outputs": {{
+    "1": {{
+      "status": "proceed",
+      "duplicates": [],
+      "rationale": "No other issue requests the trigger decision layer or provider-agnostic model client."
+    }},
+    "2": {{
+      "status": "proceed",
+      "rationale": "The requested behavior is specified in prompt files but trigger.py, model_client.py, their tests, fallback configuration, and usage documentation are not implemented."
+    }},
+    "4": {{
+      "status": "needs_clarification",
+      "questions": [
+        "How should repeat memory be scoped and reset per sales call, and should a question count as answered when it fires or only after downstream acknowledgement?",
+        "Should repeat detection run before model-based domain classification to avoid a model call, or must the numbered decision order be followed exactly?",
+        "Should utterances from the rep or an unknown speaker be suppressed, and should a prospect's technical question fire when addressed to the rep's colleague?"
+      ],
+      "rationale": "Implementation is blocked by undefined call-scoped repeat lifecycle and acknowledgement semantics, contradictory decision-order guidance, and unspecified speaker/addressee behavior for a required test case."
+    }}
+  }},
+  "manual_review_json_lines": [],
+  "review_iteration": 0,
+  "previous_fixes": "",
+  "review_manual_review_json_lines": [],
+  "last_steered_comment_id": "5080307459",
+  "last_steer_at": "2026-07-25T19:45:02Z",
+  "steer_cursor_seeded": true,
+  "github_comment_id": 5080293876,
+  "total_cost": 1.029302,
+  "model_used": "openai"
+}}
+-->
+
+--- Comment by prompt-driven-github[bot] ---
+## Step 0/13: Workflow Startup
+
+- **Mode**: Starting fresh
+- **Base branch**: origin/main
+- **Command**: pdd-issue (full change → sync flow)
+
+
+#### 🤖 Ground Truth
+(no changes)
+
+--- Comment by prompt-driven-github[bot] ---
+## Step 1/13: Search for duplicate issues
+
+## Step 1: Duplicate Check
+
+**Status:** No duplicates found
+
+### Search Performed
+- Searched for: `trigger should_fire`, `model_client fast_complete`, `repeat detection smalltalk`, `fallback provider`, `decision layer`
+- Issues reviewed: 6
+
+### Findings
+No other issue requests the same change. Targeted searches returned only #10. The broad `decision layer` search also returned closed issue #4, but #4 implements the separate terminal `screen.render(card)` presentation layer; it does not request question classification, repeat detection, or a provider-agnostic model client. Open issue #8 concerns corpus ingestion and vector search, another adjacent but distinct pipeline component. This appears to be a new change request.
+
+---
+*Proceeding to Step 2: Documentation Check*
+
+#### 🤖 Ground Truth
+(no changes)
+
+--- Comment by prompt-driven-github[bot] ---
+## Step 2/13: Check if already implemented
+
+## Step 2: Documentation Check
+
+**Status:** Not Implemented
+
+### Documentation Reviewed
+- `README.md` (currently documents only the terminal support screen)
+- `.env.example` (primary fast-model variables only)
+- `docs/writing-pdd-prompts.md` (prompt-authoring guidance)
+- `context/project_preamble.prompt` (frozen `should_fire` and `fast_complete` interfaces)
+- `prompts/trigger_python.prompt` (requested classifier specification)
+- `prompts/model_client_python.prompt` (requested provider-client specification)
+- `corpus/README.md` (example trigger classifications)
+- Repository source and test tree, including searches for `should_fire`, `fast_complete`, fallback configuration, repeat detection, and mem0
+- `CONTRIBUTING.md` and API/usage documentation (not present)
+
+### Findings
+The requested behavior is documented as a generation specification in the two prompt files, but it is not implemented or available for use. The repository contains no `trigger.py`, `model_client.py`, or `tests/` directory. The README provides no usage instructions for either API, and `.env.example` defines only the primary `FAST_MODEL_*` variables; it does not document `FALLBACK_MODEL_*`, `USE_MEM0`, or debug configuration. The corpus gives expected classification examples but no executable classifier. Therefore, there is no existing documented approach that achieves the issue's goal.
+
+---
+*Proceeding to Step 3: Identify Dev Units*
+
+#### 🤖 Ground Truth
+(no changes)
+
+--- Comment by prompt-driven-github[bot] ---
+## Step 3/13: Research to clarify specifications
+
+## Step 3: Research & Clarification
+
+**Status:** Additional Questions Identified
+
+### Summary
+Research focused on OpenAI-compatible provider failover, strict JSON handling, local semantic-repeat heuristics, and the current mem0 Python API. The requested architecture is sound, but call lifecycle and “answered” state are not representable through the frozen `should_fire(utterance)` interface and need clarification before implementation.
+
+### Research Findings
+
+#### Technical Background
+- The official OpenAI Python client supports `api_key`, `base_url`, explicit `timeout`, and `max_retries`. Its current release is **2.45.0** (July 9, 2026); it retries connection errors, HTTP 408/409/429, and 5xx responses twice by default, and its default timeout is ten minutes. This feature must therefore set `timeout <= 0.4s` and `max_retries=0`, or the SDK's implicit retries can consume the classifier budget before application-level fallback runs. The issue should not pin a model ID: the model is intentionally environment-configured and available IDs vary by provider/account. [Official OpenAI Python SDK](https://github.com/openai/openai-python)
+- OpenAI-compatible chat completions are a practical thin abstraction when both endpoints implement the same wire protocol. Construct one client per configured endpoint, call `chat.completions.create(...)`, and read `choices[0].message.content`; provider-specific behavior should remain confined to `model_client.py`.
+- Python's `json.loads()`/`JSONDecoder.decode()` rejects trailing non-whitespace data, which satisfies the “no fences or preamble” rule. Parsing must additionally validate the exact object shape and types because syntactically valid JSON can still violate the contract. Python's decoder accepts non-standard `NaN`/`Infinity` by default, so `parse_constant` should reject them if numeric fields are ever allowed. [Python `json` documentation](https://docs.python.org/3.13/library/json.html)
+- `difflib.SequenceMatcher` is lexical, not semantic. It can cheaply catch normalized duplicates and close rephrasings, but paraphrases with different vocabulary may be missed. Its score can depend on argument order and worst-case runtime is quadratic; compare short, normalized token sequences with `autojunk=False` and use a deliberately conservative, test-tuned threshold. [Python `difflib` documentation](https://docs.python.org/3.12/library/difflib.html)
+- Current mem0 OSS usage installs `mem0ai`, requires Python 3.10+, initializes `Memory`, adds messages with `add(...)`, and searches with `search(query, filters={{...}})`. Defaults include an LLM, embeddings, Qdrant, and SQLite, so it is not a cheap or network-free substitute for the local list. Current Python SDK release notes show **v2.0.3** (May 26, 2026), and entity scoping belongs in `filters`; a unique call/run ID is essential to prevent cross-call repeat matches. [Mem0 Python quickstart](https://docs.mem0.ai/open-source/python-quickstart), [Mem0 releases](https://github.com/mem0ai/mem0/releases)
+
+#### Best Practices
+- Keep cheap deterministic gates first: reject empty/non-string text, known backchannels, obvious statements, and non-prospect speech where product policy requires it. Normalize with Unicode case-folding, whitespace collapse, and punctuation removal before exact-repeat comparison.
+- Use one bounded primary attempt and, only on any primary failure, one bounded fallback attempt. Disable SDK retries so “once” is literal. The total primary-plus-fallback duration still needs to fit the 400 ms classifier budget; two independent 400 ms attempts would violate it.
+- Treat missing/partial fallback configuration as “fallback disabled.” Log only a safe provider label, prompt length, and success; never log keys, full URLs containing credentials, prompts, or exception payloads that may echo secrets.
+- Prefer precision by using deterministic deny lists/categories for pricing, scheduling, and small talk, then require an affirmative technical classification. Validate model output against an exact allow-list and fail closed to `EMPTY`.
+- Separate debug detail from mandatory one-line operational output. Debug output should name the stopping stage (`question`, `domain`, `repeat`, or `rewrite`) without exposing credentials or uncontrolled model text.
+- Tests should monkeypatch the SDK/client boundary and assert call counts, configured timeouts, disabled retries, fallback ordering, strict parsing, no-network mock behavior, and state isolation between calls.
+
+#### Similar Implementations
+- LiteLLM offers a unified `completion()` API and routing/fallback features, but it is a much larger dependency than the requested roughly 60-line adapter. For two OpenAI-compatible endpoints, the official OpenAI client plus a small loop better matches the repository's “plain Python/no speculative abstractions” constraint. [LiteLLM documentation](https://docs.litellm.ai/)
+- mem0 provides the sponsored memory-layer alternative, while the local normalized list plus `SequenceMatcher` is the appropriate default: deterministic, fast, offline-testable, and dependency-light. mem0 should be lazily imported/initialized only when enabled and must fail back to the local implementation.
+
+#### Security/Edge Cases
+- Model output is untrusted input. Do not strip fences, search for a JSON substring, or accept a prefixed/suffixed object; parse the entire response and enforce exact keys/types/allowed reasons. Limit utterance and response sizes to avoid pathological latency/memory use.
+- Prompt injection embedded in an utterance can ask the classifier to change labels or emit malformed output. Delimit the utterance as data, give a fixed schema and category rules, and fail closed. The deny rules should run outside the model where possible.
+- Global repeat state can leak between tests, users, or calls, and Streamlit reruns can either unexpectedly preserve cached module state or erase plain state. A call-scoped identifier/reset mechanism is required.
+- `speaker="rep"` and `"unknown"` semantics are unspecified. The validation explicitly includes a question addressed to the rep's colleague, but does not say whether that means a prospect's question should fire regardless of addressee, or a colleague/rep utterance should be suppressed.
+- An empty string, whitespace, non-dict input, absent/non-string `text`, excessively long text, incomplete credentials, `None` model content, malformed response objects, mem0 import/config/search failures, and logging failures must all return the frozen empty value without raising.
+
+### Refined Specifications
+Based on the research, here are clarified requirements:
+1. Preserve the frozen public signatures. Internally set the OpenAI client to `max_retries=0`; allocate explicit primary and fallback timeouts from one total budget no greater than 400 ms, and make fallback active only when all required fallback fields are non-empty.
+2. `USE_MOCK` must be checked before client construction or mem0 initialization. Tests must prove zero network/client calls in mock mode. Add `FALLBACK_MODEL_PROVIDER` to `.env.example` if provider identity is required; otherwise define the printable provider as the configured model name or sanitized base-URL host.
+3. Normalize short questions and keep answered questions in call-scoped state. Exact normalized equality is always a repeat; a high, clearly named `SequenceMatcher(..., autojunk=False)` threshold implements conservative fuzzy matching. Document that this favors speed and precision but may miss semantically equivalent paraphrases.
+4. Use mem0 only behind `USE_MEM0=False`, lazy-load it, scope every add/search by a unique call/run filter, apply a high search-score threshold, and fall back to the local list on every mem0 failure. Do not pin mem0 merely from “latest”; pin/test the chosen release when implementation begins.
+5. Accept only a complete JSON object with exactly `fire`, `question`, and `reason`; enforce boolean/string types, the reason allow-list, consistent combinations (`technical` is the only firing reason), and no markdown/preamble/trailing content. Any discrepancy returns a fresh copy of `EMPTY`.
+6. The 20-case test corpus should distinguish classification accuracy from the zero-small-talk hard gate and include pricing, scheduling, backchannels, statements containing `?`, indirect/embedded technical questions, adversarial instructions, paraphrased repeats, speaker cases, malformed JSON, and call-state reset.
+
+### Questions for Step 4 Clarification Review
+1. What marks the start/end of a sales call and resets repeat memory? May the implementation add a reset helper or consume an optional call ID from the utterance, despite the frozen utterance keys?
+2. When is a question added to “answered” memory? `should_fire()` only decides to fire and receives no callback confirming that retrieval produced/displayed an answer. Should it mean “previously fired,” or may another module acknowledge a successfully answered question?
+3. Must primary plus fallback complete within a single 400 ms total budget? If so, what split is desired (for example 200 ms each), since two 400 ms attempts violate the stage budget?
+4. Is `FALLBACK_MODEL_PROVIDER` a required new variable, and what exactly should “provider used” print when only the documented fallback name/base URL/key are configured?
+5. Should questions spoken by `rep` or `unknown` be suppressed, and how should the “addressed to the rep's colleague rather than to us” hard case be labelled?
+6. The written decision order places domain classification before repeat detection, while also saying decisions 1 and 3 should mostly avoid model calls. Should repeat detection run before the domain model call after the question gate, or is the numbered order absolute?
+
+### Why This Matters
+Without explicit lifecycle and acknowledgment semantics, repeat state will either leak across calls or incorrectly mark questions that fired but were never answered. Timeout and provider-label answers determine whether fallback meets the latency/logging acceptance criteria, while speaker and decision-order answers change expected classifications and model-call counts.
+
+### Alternative Approaches Considered
+- **Official OpenAI client with a small endpoint loop:** Minimal code and dependencies, direct timeout/retry control, and sufficient for OpenAI-compatible providers; it does not adapt non-compatible provider schemas.
+- **LiteLLM router:** Broad provider support and built-in fallback, but adds significant dependency/configuration surface for a two-provider, roughly 60-line module.
+- **Local lexical similarity:** Fast, deterministic, offline, and easy to explain; misses vocabulary-changing paraphrases and needs threshold tuning.
+- **Embeddings or mem0 as the default:** Better semantic recall and persistence, but adds latency, cost, external failure modes, state-cleanup concerns, and conflicts with the required simple default.
+
+### Recommended Approach
+Implement the official OpenAI-compatible client as a small, dependency-injected adapter with SDK retries disabled and one shared latency budget. Build the trigger as fail-closed deterministic gates plus one strict-JSON classification/rewrite call, with normalized call-scoped local repeat memory and optional lazily loaded mem0 using the same call scope. Resolve the six lifecycle, timeout, logging, speaker, and ordering questions in Step 4 before fixing tests or state APIs.
+
+---
+*Forwarding questions to Step 4: Requirements Clarity Check*
+
+#### 🤖 Ground Truth
+(no changes)
+
+--- Comment by prompt-driven-github[bot] ---
+## Step 4/13: Verify requirements are clear
+
+**Status:** FAILED
+
+### Error Details
+```
+<step_report>
+## Step 4: Requirements Clarity Check
+
+**Status:** Clarification Needed
+
+### Clarity Assessment
+| Aspect | Status |
+|--------|--------|
+| Problem statement | :white_check_mark: Clear |
+| Expected outcomes | :warning: Mostly defined, with repeat and speaker semantics unresolved |
+| Scope | :white_check_mark: Bounded |
+| Edge cases | :warning: Extensive, but call lifecycle and speaker handling are undefined |
+
+### What's Clear
+The change should add a small provider-agnostic model client with one optional fallback, plus a precision-first, fail-closed trigger classifier. Deterministic checks must suppress obvious non-questions, pricing, scheduling, and small talk; model JSON must be parsed strictly; repeat detection defaults to local memory with optional mem0; and offline tests must achieve at least 18/20 with zero small-talk fires.
+
+### Questions for @aeril716
+
+To proceed with implementation, I need clarification on the following:
+
+1. **Repeat-memory lifecycle 
+
+…[truncated]
+```
+
+---
+*Automated fallback comment - agent did not execute for this step.*
+
+#### 🤖 Ground Truth
+(no changes)
+
+--- Comment by prompt-driven-github[bot] ---
+**⏸️ Clarification Needed**
+
+**Reason:** Clarification needed
+
+Please provide the missing details, then re-add the `pdd-change` label to continue.
+
+--- Comment by aeril716 ---
+**1A, 2A, 3B.**
+
+Rationale, so the decisions are on the record:
+
+1. **A — "fired" counts as "answered", plus a `reset_call()` helper.** Keeps the frozen `should_fire(utterance)` signature intact and is the simple, testable version this project wants. The limitation (a card that fails downstream still counts as answered) is acceptable — re-firing the same card is worse than missing one, per the issue's precision-over-recall target. Document it in a comment.
+
+2. **A — order is `question → repeat → domain/rewrite`.** The numbered list in the issue is the set of decisions, not a strict execution order; the governing instruction is "do the cheap checks before the expensive one" and that decisions 1 and 3 should mostly resolve without a model call. Repeat detection before the domain model call is the correct reading.
+
+3. **B — suppress `rep`; classify `prospect` and `unknown` by content.** A prospect's technical question fires even when addressed to a colleague (label the hard case that way: it fires). The rep's own utterances never fire; `unknown` is classified by content since diarization will be unreliable.
+
+On the secondary points from Step 3: yes, primary + fallback must share one total budget ≤ 400 ms — split it 200/200 ms and set `max_retries=0` so "retry once" is literal. Add `FALLBACK_MODEL_PROVIDER` to `.env.example` alongside the other `FALLBACK_MODEL_*` keys; "provider used" prints that value (or the primary's provider name), never the base URL or key.
+
+Re-adding `pdd-change` to continue.
+
+---
+_Generated by [Claude Code](https://claude.ai/code)_
+
+--- Comment by prompt-driven-github[bot] ---
+@aeril716 **Continuing from your comment** — restarting `pdd-change` with your clarification.
+
+Job ID: `uWKbaZhTe0LSqyc4PtKe`
+
+</issue_content>
+
+% Change Summary (from previous steps)
+<step8_output>
+<step_report>
+## Step 8: Prompt Change Analysis
+
+**Status:** Changes Analyzed
+
+### Summary
+Update the two existing source prompts rather than creating modules: make `model_client` specify one bounded primary attempt plus one fully configured fallback attempt, and make `trigger` specify the approved precision-first lifecycle and `question → repeat → domain/rewrite` behavior. Step 9 should also apply the documentation edits identified in Step 5 to `README.md`, `.env.example`, and `corpus/README.md`.
+
+### Prompt Modifications
+
+#### `prompts/model_client_python.prompt`
+**Current state:** Defines the frozen `fast_complete(prompt, max_tokens=200) -> str` adapter, primary OpenAI-compatible configuration, mock behavior, fail-closed errors, optional fallback, safe logging, and an approximate 60-line target. The fallback lacks its provider variable, fallback completeness semantics, and an exact timeout/retry contract.
+
+**Changes needed:**
+1. Update the fallback requirement to require all four non-empty values: `FALLBACK_MODEL_PROVIDER`, `FALLBACK_MODEL_NAME`, `FALLBACK_MODEL_BASE_URL`, and `FALLBACK_MODEL_API_KEY`; partial configuration must behave as fallback disabled.
+2. Add requirement: make exactly one primary attempt and, only after primary timeout/error and complete fallback configuration, exactly one fallback attempt.
+3. Add requirement: assign each attempt an explicit 200 ms timeout and disable provider-SDK retries (`max_retries=0`), so the two configured attempts share the classifier's 400 ms budget.
+4. Update provider logging: print only `FAST_MODEL_PROVIDER` or `FALLBACK_MODEL_PROVIDER` for the endpoint that served the result; never derive or print a base URL, key, prompt text, or exception content that could expose secrets.
+5. Clarify failure behavior: empty/missing primary configuration, malformed/empty provider responses, client construction failures, logging failures, and all request failures return `""` without raising.
+6. Strengthen mock behavior: evaluate `USE_MOCK` before constructing or invoking any provider client, and return a deterministic canned string with zero network access.
+7. Update validation requirements to assert disabled SDK retries, 200 ms timeouts, complete-versus-partial fallback configuration, exactly one fallback attempt, provider-label output, and no client/network use in mock mode.
+8. Keep the existing `<include>context/project_preamble.prompt</include>` dependency; no new include is needed because the SDK boundary is small and the exact public interface is already supplied by the preamble.
+
+#### `prompts/trigger_python.prompt`
+**Current state:** Defines the frozen `should_fire(utterance)` result, broad four-decision classifier behavior, local and optional mem0 repeat detection, strict JSON intent, mock/debug modes, and the precision-over-recall test gate. Its written decision order conflicts with the approved cheap-first order, and it does not define call reset, speaker semantics, when a question becomes answered, exact model-response validation, or mem0 call scoping.
+
+**Changes needed:**
+1. Replace the execution order with `question → repeat → domain/rewrite`: reject invalid input, rep speech, backchannels, and obvious non-questions first; check repeat memory before any domain model call; then classify technical eligibility and produce a retrieval-ready question in the same bounded model step.
+2. Add the approved public helper `reset_call()` to start a fresh sales-call scope while preserving the frozen `should_fire(utterance)` signature and exact three-key result contract.
+3. Add requirement: record a question in answered memory immediately when `should_fire()` returns a technical fire. Document the deliberate tradeoff that downstream retrieval/display failure does not permit re-firing because duplicate suppression takes priority.
+4. Add speaker policy: `speaker="rep"` deterministically returns non-firing `not_a_question` with no model call; `prospect` and `unknown` are classified by content; a prospect's technical question still fires when addressed to the rep's colleague.
+5. Define input failure behavior for non-dicts, absent/non-string/blank text, unsupported speaker data, and oversized/pathological input: return a fresh EMPTY-shaped result and never raise.
+6. Refine local repeat behavior: normalize text, treat exact normalized matches as repeats, and use a clearly named high similarity threshold biased toward precision. Require a comment explaining that cheap lexical matching is deterministic and fast but may miss paraphrases with substantially different vocabulary.
+7. Refine optional mem0 behavior: keep `USE_MEM0=False` by default, initialize it lazily, scope add/search operations to the current call, reset to a fresh scope in `reset_call()`, use a conservative match threshold, and fall back to the local list on import, configuration, search, or write failure.
+8. Make model parsing testable and strict: accept only an entire JSON object with exactly `fire`, `question`, and `reason`; require correct types, an allowed reason, and consistent combinations where only `reason="technical"` may fire. Reject markdown fences, preambles, trailing content, extra/missing keys, and malformed JSON by returning a fresh EMPTY result.
+9. Preserve deterministic deny behavior for pricing, scheduling, and small talk, with zero small-talk fires as the hard gate and an explicit tunable precision-biased threshold/comment.
+10. Clarify one-line debug output so it identifies the stopping gate (`question`, `repeat`, or `domain/rewrite`) and reason without exposing uncontrolled model output; ordinary logging must remain fail-safe.
+11. Strengthen offline validation to cover the 20 labelled cases, no-model cheap rejections and repeats, rep suppression, unknown-speaker classification, colleague addressee behavior, reset isolation, paraphrased repeats, malformed/extra/fenced JSON, mem0 failure fallback, at least 18/20 accuracy, and zero small-talk fires.
+12. Keep `<include>context/project_preamble.prompt</include>` and declare the architectural dependency on `model_client_python.prompt` with `<pdd-dependency>model_client_python.prompt</pdd-dependency>` if architecture metadata is maintained in these prompts. Do not include generated `model_client.py`; the frozen interface in the shared preamble is sufficient generation context.
+
+### New Prompts
+
+None. The existing `model_client` and `trigger` prompts already own the provider boundary and decision layer respectively, so extending them preserves the one-prompt-per-module design.
+
+### Interface Changes
+- `model_client.fast_complete(prompt, max_tokens=200)` remains unchanged.
+- `trigger.should_fire(utterance)` and its exact `{"fire", "question", "reason"}` result remain unchanged.
+- `trigger.reset_call()` is an additive public lifecycle helper approved by the issue author; callers must invoke it at the start of each sales call.
+- Behavior becomes more explicit: rep utterances are suppressed, repeat detection precedes the model call, fired questions are immediately remembered, partial fallback configuration is disabled, and provider attempts are limited to 200 ms each with SDK retries off.
+- Existing generated tests should remain compatible. New tests will constrain the clarified behavior; any test assuming domain classification precedes repeat detection or that rep speech can fire must be updated during sync because those assumptions conflict with the approved requirements.
+
+### Conflict Check
+- The current trigger prompt says decisions run in the numbered order `question → domain → repeat → rewrite`; this must be replaced because the author explicitly approved `question → repeat → domain/rewrite`.
+- The shared preamble calls `should_fire` frozen, but adding the separately named `reset_call()` helper does not alter that frozen signature or result shape.
+- The shared preamble's 400 ms classified-path budget is compatible with two configured 200 ms attempts, though small scheduling overhead is outside those per-request timeout values.
+- The preamble requires one log line per call while the issue requires debug explanations. The prompt should distinguish the normal one-line summary from optional one-line gate detail and keep both non-throwing.
+- No generated code, examples, or tests should be edited in this step; `pdd sync` will regenerate/update them from these prompts.
+
+### Documentation Changes Carried Forward
+- `README.md`: add the Decision layer usage/configuration section, including `reset_call()`, cheap gate order, speaker policy, fired-as-answered tradeoff, fallback behavior, and offline validation command.
+- `.env.example`: add `FALLBACK_MODEL_PROVIDER` and the remaining fallback variables plus `USE_MEM0=False`, documenting that fallback requires all four values.
+- `corpus/README.md`: document per-call reset/answered semantics and the rep/prospect/unknown addressee policy.
+- No Direct Edit Candidates were identified in Step 6.
+
+### Risk Assessment
+- **Medium**: The trigger combines stateful repeat handling, optional external memory, strict untrusted JSON parsing, and precision-sensitive classification; small prompt ambiguity could create false positives or state leakage. The client also needs literal single-attempt failover within a tight budget.
+- Mitigation: encode exact state lifecycle, speaker rules, schema invariants, call counts, timeout/retry settings, and fail-closed behavior as testable requirements; retain local memory as the default/fallback; keep existing frozen interfaces; and enforce the 20-case accuracy plus zero-small-talk hard gate with offline mocks.
+
+---
+*Proceeding to Step 9: Implement Changes*
+</step_report>
+</step8_output>
+
+% Manual Review Required (from orchestrator aggregation)
+
+The orchestrator collected every ``MANUAL_REVIEW: <path> — <reason>`` line emitted by Step 9 JSON/prose, synthesized from Step 10 associated-doc conflicts, or emitted by Step 11/12 review-loop JSON/prose. These are items the workflow could not safely auto-resolve. They MUST be surfaced in the PR body so reviewers can address them — not buried elsewhere on the issue thread.
+
+<manual_review_lines>
+None
+</manual_review_lines>
+
+% User Story Coverage (from issue-derived story generation)
+
+The orchestrator generated an issue-derived user story for the existing,
+non-runtime prompts changed by this workflow and staged it for this PR. The
+summary below is the exact PR-body section to render. If the value is the
+literal ``None``, no story was generated and the section must be omitted.
+
+<user_story_summary>
+### User Stories
+- Skipped: story policy is `off` (`PDD_STORY_POLICY=off`).
+</user_story_summary>
+
+% Your Task
+
+1. **Stage all changes**
+   ```bash
+   cd /tmp/pdd_job_uWKbaZhTe0LSqyc4PtKe_oy3dm84v/.pdd/worktrees/change-issue-10
+   git add -A
+   ```
+
+2. **Create commit**
+   - Use a clear commit message referencing the issue
+   - Format: `feat: [brief description] (#10)`
+   - If `git status --porcelain` shows no staged or unstaged changes after
+     staging, do not create an empty commit. Still push the branch in step 3,
+     then continue to the existing-PR check in step 4.
+
+3. **Push branch**
+
+   If `clean_restart` is `true`, the remote branch may have divergent history from the
+   stopped run. Use `--force-with-lease` to overwrite it safely:
+   ```bash
+   git push --force-with-lease -u origin change/issue-10
+   ```
+   Otherwise use a standard push:
+   ```bash
+   git push -u origin change/issue-10
+   ```
+
+4. **Create or update pull request**
+
+   An open PR for this branch may already exist, especially after a retry or
+   resume. Always check first:
+   ```bash
+   gh pr list --repo aeril716/live-answer-card-test --head change/issue-10 --state open --json number,url
+   ```
+   - If an open PR is found, update it in place (the branch was already force-pushed):
+     ```bash
+     gh pr edit <number> --repo aeril716/live-answer-card-test --base main --title "feat: [description] (#10)" --body "..."
+     ```
+     Record that PR's number and URL as the result; skip `gh pr create`.
+   - If no open PR exists, create one:
+     ```bash
+     gh pr create --repo aeril716/live-answer-card-test --title "feat: [description] (#10)" --body "..." --base main --head change/issue-10
+     ```
+
+   Whether creating or editing, the PR must:
+   - Reference the original issue
+   - Summarize the prompt changes made
+   - List files modified
+   - Mention generated user-story artifacts when `<user_story_summary>` is not `None`
+   - Include next steps for reviewer
+
+5. **Link PR to issue**
+   - The PR body should include `Closes #10` or `Fixes #10`
+   - This ensures the issue is automatically closed when PR is merged
+
+% Output
+
+Push the branch (use `--force-with-lease` if `clean_restart` is `true`), then create or
+update the PR following the logic in step 4 above:
+
+```bash
+gh pr list --repo aeril716/live-answer-card-test --head change/issue-10 --state open --json number,url
+# If no open PR exists:
+gh pr create --repo aeril716/live-answer-card-test --title "feat: [description] (#10)" --body "..." --base main --head change/issue-10
+# OR, if an open PR already exists:
+gh pr edit <number> --repo aeril716/live-answer-card-test --base main --title "feat: [description] (#10)" --body "..."
+```
+
+After attempting to create or update the PR, return your findings in your final response.
+Do not post GitHub issue comments yourself; the orchestrator extracts the
+`<step_report>` block and posts it with trusted credentials when GitHub state is
+enabled.
+
+% Structured Output Artifacts (REQUIRED — source of truth)
+
+After every PR attempt, write TWO files into the artifacts directory `/tmp/pdd_job_uWKbaZhTe0LSqyc4PtKe_oy3dm84v/.pdd/worktrees/change-issue-10/.pdd/change/issue-10` (already created for you), including failure cases where no PR was created or updated. The orchestrator reads the JSON to learn the PR URL and outcome; the PR link inside the `<step_report>` block is now a FALLBACK only.
+
+1. `/tmp/pdd_job_uWKbaZhTe0LSqyc4PtKe_oy3dm84v/.pdd/worktrees/change-issue-10/.pdd/change/issue-10/13_create_pr.json` — the machine-readable result. Emit valid JSON:
+   ```json
+   {{{{
+     "status": "pr_created",
+     "pr_url": "https://github.com/{aeril716}/{live-answer-card-test}/pull/42",
+     "pr_number": 42,
+     "summary": "one-line description of the PR"
+   }}}}
+   ```
+   - `status`: `"pr_created"` for a new PR, `"pr_updated"` when you edited an existing open PR in place (clean-restart path), or `"blocked"` when the PR could not be created/updated (the orchestrator maps this to a workflow failure).
+   - `pr_url` / `pr_number`: the created/updated PR's URL and number. For `"blocked"`, set `pr_url` to `""` and omit `pr_number` if unknown.
+   - `summary`: one-line PR summary, or for `"blocked"` a concise error summary naming the failed command/action.
+
+2. `/tmp/pdd_job_uWKbaZhTe0LSqyc4PtKe_oy3dm84v/.pdd/worktrees/change-issue-10/.pdd/change/issue-10/13_create_pr.md` — the exact Markdown comment body (the same content you place inside the `<step_report>` block below), posted verbatim as the `## Step 13/13` issue comment.
+
+Still emit the `<step_report>` block below UNCHANGED — include the PR link on success, or the blocking error summary on `"blocked"`. It is the orchestrator's fallback when these files are missing.
+
+**PR Body Format:**
+```markdown
+## Summary
+
+[1-2 sentence description of what this PR does]
+
+Closes #10
+
+## Changes Made
+
+### Prompts Modified
+- `prompts/xxx_python.prompt` - [brief description]
+- `prompts/yyy_python.prompt` - [brief description]
+
+### Documentation Updated
+- `README.md` - [brief description]
+
+Render the contents of ``<user_story_summary>`` here. If the value is the
+literal ``None``, omit this section entirely. Otherwise include it verbatim as a
+PR-body section so reviewers can see which issue-derived user story was generated
+and which prompt metadata it links to.
+
+## ⚠️ Manual Review Required
+
+Render the contents of ``<manual_review_lines>`` here. If the value is the literal ``"None"``, omit this section entirely. Otherwise emit one bullet per ``MANUAL_REVIEW`` line so reviewers see every flagged conflict in the PR body without digging through the issue thread:
+
+- `path/to/doc.md` — [reason] — review [section]
+
+## Review Checklist
+
+- [ ] Prompt syntax is valid
+- [ ] PDD conventions followed
+- [ ] Documentation is up to date
+
+## Next Steps After Merge
+
+1. Regenerate code from modified prompts in dependency order:
+   ```bash
+   ./sync_order.sh
+   ```
+   Or manually:
+   ```
+   pdd sync trigger
+pdd sync model_client
+   ```
+2. Run tests to verify functionality
+3. Deploy if applicable
+
+---
+*Created by pdd change workflow*
+```
+
+**Step Report Format:**
+
+**If PR creation/update succeeded:**
+```markdown
+<step_report>
+## Step 13: Pull Request Created
+
+**Status:** PR Ready for Review
+
+### Pull Request
+[PR #{{pr_number}}]({{pr_url}})
+
+### Summary
+- Branch: `change/issue-10`
+- Files changed: {{N}}
+- Ready for review
+
+### What's Next
+1. Review the PR
+2. Run `./sync_order.sh` after merge to regenerate code in dependency order
+3. Run tests to verify
+
+---
+*Agentic change workflow complete. Total cost: ${{total_cost:.4f}}*
+</step_report>
+```
+
+**If PR creation/update was blocked:**
+```markdown
+<step_report>
+## Step 13: Pull Request Blocked
+
+**Status:** PR Creation Blocked
+
+### Blocking Error
+- Failed action: [push | create PR | update PR | detect existing PR]
+- Error: [concise command/action failure summary]
+
+### Remediation
+1. [Concrete next action for the maintainer]
+2. Re-run `pdd change` after the blocker is resolved
+
+---
+*Agentic change workflow blocked before PR creation. Total cost: ${{total_cost:.4f}}*
+</step_report>
+```
+
+% Important
+
+- Always link the PR to the issue using "Closes #N" or "Fixes #N"
+- Push to origin before creating PR
+- Include clear next steps for the reviewer
+- Report the PR URL in the `<step_report>` block when a PR exists; for `"blocked"`, report the blocking error and remediation instead
+- This is the final step - workflow is complete after this
+
+
+## User Feedback
+The user provided the following feedback from a previous execution attempt. Factor this into your response:
+@aeril716 (2026-07-25T19:54:57+00:00): **1A, 2A, 3B.**
+
+Rationale, so the decisions are on the record:
+
+1. **A — "fired" counts as "answered", plus a `reset_call()` helper.** Keeps the frozen `should_fire(utterance)` signature intact and is the simple, testable version this project wants. The limitation (a card that fails downstream still counts as answered) is acceptable — re-firing the same card is worse than missing one, per the issue's precision-over-recall target. Document it in a comment.
+
+2. **A — order is `question → repeat → domain/rewrite`.** The numbered list in the issue is the set of decisions, not a strict execution order; the governing instruction is "do the cheap checks before the expensive one" and that decisions 1 and 3 should mostly resolve without a model call. Repeat detection before the domain model call is the correct reading.
+
+3. **B — suppress `rep`; classify `prospect` and `unknown` by content.** A prospect's technical question fires even when addressed to a colleague (label the hard case that way: it fires). The rep's own utterances never fire; `unknown` is classified by content since diarization will be unreliable.
+
+On the secondary points from Step 3: yes, primary + fallback must share one total budget ≤ 400 ms — split it 200/200 ms and set `max_retries=0` so "retry once" is literal. Add `FALLBACK_MODEL_PROVIDER` to `.env.example` alongside the other `FALLBACK_MODEL_*` keys; "provider used" prints that value (or the primary's provider name), never the base URL or key.
+
+Re-adding `pdd-change` to continue.
+
+---
+_Generated by [Claude Code](https://claude.ai/code)_
+
+
+You have full file access to explore and modify files as needed.
