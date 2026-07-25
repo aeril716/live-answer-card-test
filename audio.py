@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-USE_MOCK: bool = True
+USE_MOCK: bool = False
 EMPTY: Dict[str, Any] = {"text": "", "speaker": "unknown", "ts": 0.0}
 
 _MOCK_UTTERANCES: List[Dict[str, Any]] = [
