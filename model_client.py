@@ -12,7 +12,10 @@ try:
 except Exception:
     pass
 
-USE_MOCK: bool = True
+# Auto-detect: real once the (already-required) primary provider is
+# configured, mock otherwise. Unset FAST_MODEL_PROVIDER (local dev/tests,
+# current default) keeps mock; setting it in the Render dashboard goes real.
+USE_MOCK: bool = not os.getenv("FAST_MODEL_PROVIDER")
 
 def fast_complete(prompt: str, max_tokens: int = 200) -> str:
     """

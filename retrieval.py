@@ -27,12 +27,18 @@ HEADING instead — the section topic is a guaranteed, correct anchor. Rationale
 exactly the failure this product cannot have.
 """
 
+import os
 import re
 
 import model_client
 from ingest import search
 
-USE_MOCK: bool = True
+# Same env var ingest.search() already reads, so one flag flips both the
+# card-level shortcut here and the store-level query together. Unset (local
+# dev/tests) keeps the current mock default; explicitly "false" goes real.
+USE_MOCK: bool = os.getenv("RETRIEVAL_USE_MOCK", "true").strip().lower() not in (
+    "0", "false", "no",
+)
 
 EMPTY = {"keywords": [], "detail": "", "source": "", "confidence": 0.0}
 
