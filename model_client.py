@@ -17,7 +17,7 @@ def fast_complete(prompt: str, max_tokens: int = 200) -> str:
     Returns:
         str: The generated completion text.
     """
-    print(f"ENTER fast_complete | prompt={prompt!r} | max_tokens={max_tokens}")
+    print(f"ENTER fast_complete | prompt={str(prompt)[:80]!r} | max_tokens={max_tokens}")
     
     if USE_MOCK:
         result = "mocked response"
@@ -57,7 +57,10 @@ def fast_complete(prompt: str, max_tokens: int = 200) -> str:
                 "max_tokens": max_tokens
             }
             
-            resp = requests.post(url, headers=headers, json=payload, timeout=3.0)
+            base = url.rstrip("/")
+            if not base.endswith("/chat/completions"):
+                base += "/chat/completions"
+            resp = requests.post(base, headers=headers, json=payload, timeout=0.2)
             resp.raise_for_status()
             data = resp.json()
             
