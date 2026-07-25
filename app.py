@@ -133,7 +133,7 @@ def _streamlit_active():
 if _streamlit_active():
     _run_app()
 
-if __name__ == "__main__":
+if __name__ == "__main__" and not _streamlit_active():
     # Offline validation without a UI: play the mock audio sequence through
     # the full loop and print every decision and card.
     mods, missing = load_modules()
