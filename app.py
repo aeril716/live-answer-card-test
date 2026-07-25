@@ -56,23 +56,55 @@ def process_utterance(mods, utterance):
         return None
 
 
+_CARD_CSS = """
+<style>
+header[data-testid="stHeader"], #MainMenu, footer {display:none;}
+.lac-card{
+  background:#111E42; border:1px solid #243560; border-radius:16px;
+  padding:34px 38px; margin-top:8px;
+}
+.lac-card .kw{
+  font-size:clamp(30px,5.2vw,54px); font-weight:800; line-height:1.18;
+  letter-spacing:.01em; color:#F2F5FB; text-transform:uppercase;
+}
+.lac-card .kw:first-child{color:#FFC94D;}
+.lac-card .det{margin-top:16px; color:#B7BFCF; font-size:15px; line-height:1.5;}
+.lac-card .src{
+  margin-top:8px; color:#8B96B0; font-size:13px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+.lac-card.lac-empty{text-align:center; color:#5A6685; padding:44px 38px;}
+.lac-card.lac-empty .dash{font-size:46px; line-height:1;}
+.lac-card.lac-empty .lst{
+  margin-top:10px; font-size:12px; letter-spacing:.18em; text-transform:uppercase;
+}
+</style>
+"""
+
+
 def _card_markdown(card):
-    # One single markdown block: st.empty() replaces one element atomically,
-    # which avoids ghost fragments from partially-replaced multi-element cards.
+    # One single markdown element: st.empty() replaces it atomically, which
+    # avoids ghost fragments from partially-replaced multi-element cards.
+    # Look follows ignore-gameplan.context/live_answer_card_prototype.html.
+    import html as _html
     card = card or {}
     keywords = [str(k) for k in card.get("keywords", [])][:3]
     if card.get("confidence", 0.0) >= CONFIDENCE_THRESHOLD and keywords:
-        body = "\n\n".join(f"## {kw.upper()}" for kw in keywords)
-        detail = card.get("detail", "")
-        source = card.get("source", "")
-        return f"{body}\n\n*{detail}*  \n`{source}`"
-    return "## —\n\n*listening…*"
+        kws = "".join(f'<div class="kw">{_html.escape(k)}</div>' for k in keywords)
+        detail = _html.escape(card.get("detail", ""))
+        source = _html.escape(card.get("source", ""))
+        return (f'<div class="lac-card">{kws}'
+                f'<div class="det">{detail}</div>'
+                f'<div class="src">{source}</div></div>')
+    return ('<div class="lac-card lac-empty"><div class="dash">—</div>'
+            '<div class="lst">listening</div></div>')
 
 
 def _run_app():
     import streamlit as st
 
     st.set_page_config(page_title="Live Answer Card", page_icon="📇")
+    st.markdown(_CARD_CSS, unsafe_allow_html=True)
     mods, missing = load_modules()
 
     st.sidebar.title("Live Answer Card")
@@ -87,7 +119,7 @@ def _run_app():
         if q:
             card = mods["retrieval"].answer(q)
             mods["screen"].render(card)
-            st.markdown(_card_markdown(card))
+            st.markdown(_card_markdown(card), unsafe_allow_html=True)
 
     else:  # Live
         col_a, col_b = st.sidebar.columns(2)
@@ -101,7 +133,7 @@ def _run_app():
             st.session_state.running = False
 
         placeholder = st.empty()
-        placeholder.markdown(_card_markdown(None))
+        placeholder.markdown(_card_markdown(None), unsafe_allow_html=True)
         mock_audio = getattr(mods["audio"], "USE_MOCK", False)
         empties = 0
         while st.session_state.running:
@@ -117,7 +149,7 @@ def _run_app():
             card = process_utterance(mods, u)
             if card is not None:
                 mods["screen"].render(card)
-                placeholder.markdown(_card_markdown(card))
+                placeholder.markdown(_card_markdown(card), unsafe_allow_html=True)
             if mock_audio:
                 time.sleep(2.0)  # pace the replayed call so cards are watchable
 
