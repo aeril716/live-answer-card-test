@@ -101,7 +101,7 @@ documents.
 - Generate 2–3 short keywords from the retrieved passages using a fast model
 - The first keyword carries the answer; the rest are follow-up detail
 - Return a one-or-two sentence detail string, revealed only on demand
-- Return the source filename and page or section for every answer
+- Return the source filename and section for every answer
 - Return a confidence score between 0.0 and 1.0
 
 **Confidence**: derived from both retrieval distance and the model's own
@@ -292,8 +292,8 @@ Only `model_client` may import a model provider SDK. Every other module calls
   },
   "card": {
     "keywords": ["SOC 2 — YES", "TYPE II", "NDA → REPORT"],
-    "detail": "SOC 2 Type II, renewed March 2024 after an external audit.",
-    "source": "security-overview.pdf p.4",
+    "detail": "SOC 2 Type II, renewed March 2026 after an external audit.",
+    "source": "security-overview.md §1.1",
     "confidence": 0.91
   }
 }
