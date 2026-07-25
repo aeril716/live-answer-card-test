@@ -141,6 +141,13 @@ def _card_markdown(card, question=""):
     return f'<div class="lac">{head}{qrow}{body}</div>'
 
 
+def _scene_label(i, item):
+    card = item.get("card") or {}
+    if card.get("confidence", 0.0) >= CONFIDENCE_THRESHOLD and card.get("keywords"):
+        return f"{i + 1} · {str(card['keywords'][0])[:16]}"
+    return f"{i + 1} · quiet"
+
+
 def _run_app():
     import streamlit as st
 
@@ -171,12 +178,15 @@ def _run_app():
                 "`scripts/run_local_live.sh`, then open "
                 "[localhost:8501](http://localhost:8501)."
             )
+        hist = st.session_state.setdefault("history", [])
         col_a, col_b = st.sidebar.columns(2)
         if col_a.button("Start"):
             if getattr(mods["audio"], "USE_MOCK", False):
                 # replay the rehearsed mock call from the top on every Start
                 mods["audio"] = importlib.reload(mods["audio"])
             mods["trigger"].reset_call()
+            hist.clear()
+            st.session_state.pop("scene", None)
             st.session_state.running = True
         if col_b.button("Stop"):
             st.session_state.running = False
@@ -196,14 +206,33 @@ def _run_app():
                 continue
             empties = 0
             card = process_utterance(mods, u)
-            if card is not None:
+            fired = (card is not None
+                     and card.get("confidence", 0.0) >= CONFIDENCE_THRESHOLD
+                     and card.get("keywords"))
+            if fired:
+                # only fired cards touch the screen: silence never erases the
+                # keywords, and non-triggering talk is never shown
                 mods["screen"].render(card)
-            # redraw on every utterance: silence with the question visible IS
-            # the product argument, so show it rather than freezing the card
-            placeholder.markdown(_card_markdown(card, u.get("text", "")),
+                hist.append({"q": u.get("text", ""), "card": card})
+                placeholder.markdown(_card_markdown(card, u.get("text", "")),
+                                     unsafe_allow_html=True)
+                if mock_audio:
+                    time.sleep(2.5)  # pace the replay so cards are watchable
+
+        # Call over: every moment stays browsable, like the prototype's scene
+        # tabs. Click a numbered tab to bring any card (or silence) back up.
+        if hist and not st.session_state.running:
+            idx = st.session_state.get("scene", len(hist) - 1)
+            cols = st.columns(len(hist))
+            for i, item in enumerate(hist):
+                if cols[i].button(_scene_label(i, item), key=f"scene{i}",
+                                  use_container_width=True,
+                                  type="primary" if i == idx else "secondary"):
+                    idx = i
+                    st.session_state.scene = i
+            item = hist[idx]
+            placeholder.markdown(_card_markdown(item["card"], item["q"]),
                                  unsafe_allow_html=True)
-            if mock_audio:
-                time.sleep(2.5)  # pace the replayed call so cards are watchable
 
 
 def _streamlit_active():
