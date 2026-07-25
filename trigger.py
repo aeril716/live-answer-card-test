@@ -10,7 +10,10 @@ from difflib import SequenceMatcher
 
 import model_client
 
-USE_MOCK = True
+# Mock by default (deterministic offline classifier). Set TRIGGER_USE_MOCK=false
+# in .env to route domain classification through model_client (e.g. Cerebras).
+USE_MOCK = os.getenv("TRIGGER_USE_MOCK", "true").strip().lower() \
+    not in ("0", "false", "no", "off")
 USE_MEM0 = os.getenv("USE_MEM0", "").strip().lower() in {"1", "true", "yes", "on"}
 DEBUG = os.getenv("TRIGGER_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}
 
