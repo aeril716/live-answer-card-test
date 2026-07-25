@@ -1,0 +1,9 @@
+# Lane 1 (retrieval) dependencies.
+# model_client already relies on requests + python-dotenv.
+
+chromadb==1.5.9          # persisted local vector store + bundled all-MiniLM-L6-v2 ONNX embeddings
+python-dotenv==1.2.2     # load .env (keys never committed)
+requests==2.33.1         # used by model_client for the OpenAI-compatible call
+
+# dev / test
+pytest==9.1.1
