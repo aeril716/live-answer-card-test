@@ -131,3 +131,14 @@ def test_search_bad_query_returns_empty_never_raises():
 def test_gateway_retention_prefers_security_section_3():
     hits = ingest.search("How long does Gateway keep request logs?", k=3)
     assert hits[0]["source"] == "security-overview.md §3"
+
+
+@real_store
+def test_store_exists_true_when_built():
+    assert ingest.store_exists() is True
+
+
+@real_store
+def test_if_missing_is_idempotent_when_store_present():
+    # A deploy step re-running --if-missing must not rebuild or fail.
+    assert ingest.main(["--if-missing"]) == 0

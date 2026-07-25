@@ -266,6 +266,19 @@ def build_store():
     return len(all_ids)
 
 
+def store_exists() -> bool:
+    """True when a non-empty persisted store is already present.
+
+    Used by the deploy/build step (``python ingest.py --if-missing``) to make
+    provisioning idempotent — it never inspects the store from the live request
+    path, only from the standalone job.
+    """
+    try:
+        return _get_collection(create=False).count() > 0
+    except Exception:
+        return False
+
+
 # --- search (live path) ---------------------------------------------------
 
 # How many dense candidates to pull before lexical re-ranking, and how much the
@@ -435,13 +448,37 @@ def search(query: str, k: int = 3) -> list:
         return []
 
 
-if __name__ == "__main__":
-    n = build_store()
-    if n == 0:
-        print("[ingest] WARNING: store is empty")
-        sys.exit(1)
-    # Smoke check so the standalone run proves the store is queryable.
+def main(argv=None):
+    """Standalone entry point. Builds the store and exits; never run from the app.
+
+    Flags (for a deploy/build step):
+      --if-missing  build only when no non-empty store exists yet (idempotent)
+      --force       always rebuild from scratch (the default)
+    """
+    import argparse
+    parser = argparse.ArgumentParser(description="Build the Vantic corpus store.")
+    parser.add_argument("--if-missing", action="store_true",
+                        help="build only if the store is absent or empty")
+    parser.add_argument("--force", action="store_true",
+                        help="always rebuild (default behaviour)")
+    args = parser.parse_args(argv)
+
+    if args.if_missing and store_exists():
+        print(f"[ingest] store already present at {STORE_DIR}; nothing to build")
+        n = 1  # non-empty; skip the build
+    else:
+        n = build_store()
+        if n == 0:
+            print("[ingest] WARNING: store is empty")
+            return 1
+
+    # Smoke check so the run proves the store is queryable.
     for q in ("Are you SOC 2 certified?", "How long does Gateway keep request logs?"):
         hits = search(q, k=3)
         top = hits[0] if hits else {"source": "-", "score": 0.0}
         print(f"[ingest] check {q!r} -> {top['source']} ({top['score']:.3f})")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

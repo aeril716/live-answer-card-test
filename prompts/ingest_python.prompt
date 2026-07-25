@@ -40,7 +40,9 @@ function the retrieval module imports. It is never invoked from the live app.
    explain the retrieval and confidence-scoring approach in the PR, not here.
 5. A standalone run (`python ingest.py`) builds the persisted store from the six
    docs and exits with a clear per-file summary. The live app never triggers a
-   build; `search()` reads the already-built store.
+   build; `search()` reads the already-built store. Re-running the build is
+   safe: a deploy/build step can request an idempotent build that no-ops when a
+   non-empty store already exists, and expose whether a store is present.
 6. Given an empty, unreadable, or section-less file, then building skips it,
    prints one line naming the file, and finishes without raising.
 7. Given an invalid query (non-string or blank) or any internal error, then
