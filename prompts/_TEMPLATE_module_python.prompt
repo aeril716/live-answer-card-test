@@ -1,0 +1,41 @@
+% <module>_python.prompt — <function>(), <mock|real> version
+% Template. Copy to prompts/<module>_python.prompt and fill every section.
+% Read docs/writing-pdd-prompts.md before editing anything under prompts/.
+
+<include>context/project_preamble.prompt</include>
+
+MODULE
+
+Write `<module>.py`. It exposes `<function>(<args>)` which <one sentence, the
+user-visible outcome>. <Mock only in this version — the real <thing> comes in a
+later prompt. | Real version, replacing the mock behind the same interface.>
+
+INTERFACE — frozen
+
+    <The exact signature and return-dict shape from the preamble, restated
+    here with a concrete example return value.>
+
+    EMPTY = <the empty version of this module's contract>
+
+BEHAVIOR
+
+<Numbered, observable criteria. Each one must be testable: "Given X, when Y,
+then Z." If you cannot write a test that fails when a line is violated, cut
+the line. State product decisions (thresholds, counts, budgets). Do NOT state
+implementation choices (chunk size, model name, retry backoff) — leave those
+to the generator and ask it to explain them in the PR.>
+
+n. Given any internal error, then EMPTY is returned and nothing is raised.
+n+1. Every call prints one line in the form `[<module>] in=<...> out=<...>`.
+
+MUST NOT
+
+- Must not raise under any circumstance.
+- Must not import <libraries out of scope for this version>.
+- <Other forbidden outcomes, each one testable.>
+
+VALIDATION
+
+- Running `python <module>.py` executes a `__main__` block that <exercises the
+  known cases and at least one unknown/failure case> and prints each result.
+- Done when: <the two or three observable end states that close this prompt>.
