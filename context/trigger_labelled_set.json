@@ -1,0 +1,22 @@
+[
+  ["Are you SOC 2 certified?", "prospect", true, "technical"],
+  ["How was your weekend?", "prospect", false, "smalltalk"],
+  ["How much does the enterprise tier cost?", "prospect", false, "smalltalk"],
+  ["mm-hmm", "prospect", false, "not_a_question"],
+  ["That makes sense.", "prospect", false, "not_a_question"],
+  ["Could we get on a call Thursday?", "prospect", false, "smalltalk"],
+  ["Is it still raining there?", "unknown", false, "smalltalk"],
+  ["Great chatting with you — before I forget, do you train models on our data?", "prospect", true, "technical"],
+  ["How long does Gateway keep request logs?", "prospect", true, "technical"],
+  ["Can we self-host Traces?", "unknown", true, "technical"],
+  ["Do you support OpenTelemetry?", "prospect", true, "technical"],
+  ["What's the uptime commitment for Gateway?", "prospect", true, "technical"],
+  ["How much latency does the proxy add on a cache hit?", "prospect", true, "technical"],
+  ["Sam, can you ask whether their API supports SAML SSO?", "prospect", true, "technical"],
+  ["Does our Gateway support regional failover?", "rep", false, "not_a_question"],
+  ["What did you have for lunch?", "prospect", false, "smalltalk"],
+  ["Right, gotcha.", "unknown", false, "not_a_question"],
+  ["Are customer requests encrypted at rest?", "prospect", true, "technical"],
+  ["Is customer request data encrypted while stored?", "prospect", false, "repeat"],
+  ["I suppose that is your standard deployment?", "prospect", false, "not_a_question"]
+]

@@ -1,0 +1,38 @@
+<pdd-reason>Provides a safe terminal preview of support cards before the Streamlit UI exists.</pdd-reason>
+
+<pdd-interface>
+{
+  "type": "module",
+  "module": {
+    "functions": [
+      {"name": "render", "signature": "(card: dict)", "returns": "None"}
+    ]
+  }
+}
+</pdd-interface>
+
+% Goal
+Create the root-level `screen.py` terminal renderer for support cards.
+
+% Role & Scope
+Expose a dependency-free terminal boundary that renders trustworthy card output
+or a deliberate empty state. Streamlit and other UI integrations are out of scope.
+
+% Requirements
+1. Export `render(card: dict) -> None`: draw a complete card at confidence `>= 0.6`; otherwise draw the empty state.
+2. A renderable card is a dictionary with usable `keywords`, `detail`, `source`, and `confidence` fields. Incomplete or malformed card data selects the empty state without raising.
+3. A rendered card is a deterministic bordered terminal box containing at most the first three keywords, uppercased and one per line, with the source underneath.
+4. Confidence exactly `0.6` renders. Boolean, non-numeric, and non-finite confidence values are invalid.
+5. The empty state is a visibly deliberate bordered box containing `-`, never a blank line, error message, or partial card.
+6. Keyword and source text must not contain line breaks or terminal control characters that can deform the display; unsafe or unusable required content selects the empty state.
+7. In addition to the multi-line bordered rendered or empty-state output, every call emits exactly one diagnostic/status line in the form `[screen] in=conf=<confidence> out=<rendered|empty>`, using a safe representation of confidence or `None` when unavailable.
+8. `render` contains all failures and never propagates an exception under any circumstance. If rendering cannot complete, it falls back to the deliberate empty-state box and emits the diagnostic/status line with `out=empty`.
+9. Use only the Python standard library, produce no output on import, and include a guarded `__main__` demonstration of a full card, confidence `0.4`, an empty dictionary, and a card with five keywords.
+
+% Dependencies
+None.
+
+% Deliverables
+- Code: `screen.py`
+- Example: `context/screen_example.py`
+- Tests: `tests/test_screen.py`

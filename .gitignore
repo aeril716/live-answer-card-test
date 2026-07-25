@@ -3,4 +3,7 @@ __pycache__/
 *.pyc
 chroma_db/
 demo_cache.json
+
 litellm_cache.sqlite
+.rocketride/
+litellm_cache.sqlite/

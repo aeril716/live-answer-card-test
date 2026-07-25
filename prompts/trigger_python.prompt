@@ -1,0 +1,82 @@
+<pdd-reason>Decides when technical-question support cards should fire while suppressing noise and repeats.</pdd-reason>
+
+<pdd-interface>
+{
+  "type": "module",
+  "module": {
+    "functions": [
+      {"name": "should_fire", "signature": "(utterance: dict)", "returns": "dict"},
+      {"name": "reset_call", "signature": "()", "returns": "None"}
+    ]
+  }
+}
+</pdd-interface>
+
+<pdd-dependency>model_client_python.prompt</pdd-dependency>
+
+<include>context/project_preamble.prompt</include>
+
+% Goal
+Provide a precision-first decision layer that shows cards only for eligible
+technical questions and fails closed whenever a safe decision cannot be made.
+
+% Role & Scope
+Create root-level `trigger.py`. `should_fire(utterance)` decides whether a
+technical support card appears; `reset_call()` begins a new repeat-memory
+scope. Use only `model_client.fast_complete()` for model access.
+
+% Requirements
+1. Preserve `should_fire(utterance: dict) -> dict`, `reset_call() -> None`, and
+   the result shape `{"fire": bool, "question": str, "reason": str}`. Reasons
+   are `technical`, `smalltalk`, `repeat`, or `not_a_question`; failures return
+   a fresh `{"fire": False, "question": "", "reason": "not_a_question"}`.
+2. Evaluate `question → repeat → domain/rewrite`. Reject invalid input, rep
+   speech, statements, and back-channels without a model call. Reject a
+   current-call repeat before making the single classification/rewrite call.
+   Pricing, scheduling, and small talk never fire.
+3. Classify `prospect` and `unknown` by content. A prospect's technical
+   question fires even when addressed to a colleague; `rep` never fires.
+4. When a retrieval-ready technical question fires, immediately remember it
+   for the current call. This intentionally treats “fired” as “answered” even
+   if downstream work fails, because duplicate suppression has priority.
+   `reset_call()` clears that scope.
+5. Default repeat matching is normalized, fast, deterministic lexical
+   similarity with a clearly named conservative threshold; document that it
+   may miss vocabulary-changing paraphrases. Optional mem0 storage is enabled
+   by `USE_MEM0`, remains scoped to the call, and falls back to local matching
+   on any mem0 failure.
+6. Accept model output only when the entire response is a JSON object with
+   exactly `fire`, `question`, and `reason`, correct types, an allowed reason,
+   and a consistent combination (only `technical` fires). Fences, preambles,
+   trailing content, extra keys, and malformed data fail closed.
+7. `USE_MOCK=True` uses a deterministic hardcoded classification lookup with
+   no model call.
+8. Precision over recall governs all classification and repeat thresholds.
+   Mark the tuning point in a code comment.
+9. Every call prints one line containing
+   `[trigger] in=<text> fire=<bool> reason=<reason>`. Render `<text>` as a
+   bounded, escaped representation that replaces or escapes newlines,
+   terminal controls, and other unsafe characters so user input cannot create
+   extra lines or terminal effects.
+10. Debug mode adds the stopping gate (`question`, `repeat`, or
+    `domain/rewrite`) and reason in one safe line. Escape and bound all
+    user-derived log fields and never print model output.
+11. The stable labelled fixture below is the accuracy oracle: one flat,
+    plainly editable list of `(text, speaker, expected_fire, expected_reason)`
+    cases. Run cases in file order with shared call state, score exact `fire`
+    and `reason`, require at least 18/20 correct, and independently enforce zero
+    fires for every case whose `expected_reason` is `smalltalk` (including
+    pricing and scheduling).
+12. Offline tests also verify no-model cheap gates, reset isolation, strict
+    response parsing, failure containment, and mem0-to-local fallback.
+
+% Dependencies
+The preamble supplies frozen interfaces and project-wide constraints.
+<trigger_labelled_oracle>
+<include>context/trigger_labelled_set.json</include>
+</trigger_labelled_oracle>
+
+% Deliverables
+- Code: `trigger.py`
+- Example: `context/trigger_example.py`
+- Tests: `tests/test_trigger.py`

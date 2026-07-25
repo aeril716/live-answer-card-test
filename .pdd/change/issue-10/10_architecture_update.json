@@ -1,0 +1,9 @@
+{
+  "architecture_files_modified": [
+    "prompts/model_client_python.prompt",
+    "prompts/trigger_python.prompt"
+  ],
+  "associated_docs_modified": [],
+  "associated_docs_conflicts": [],
+  "associated_docs_unchanged": []
+}

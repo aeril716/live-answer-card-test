@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Live Answer Card — the answer before the stall</title>
+<style>
+  :root{
+    --bg:#0A1430;
+    --bg2:#0D1838;
+    --panel:#111E42;
+    --line:#243560;
+    --accent:#4DA3FF;
+    --qgray:#B7BFCF;
+    --dim:#8B96B0;
+    --faint:#5A6685;
+    --paper:#F2F5FB;
+    --amber:#FFC94D;
+    --chipbg:rgba(255,255,255,0.10);
+    --chipbg-hover:rgba(255,255,255,0.18);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--bg);
+    color:var(--paper);
+    font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;
+    line-height:1.5;
+  }
+  section{padding:clamp(56px,10vh,110px) 6vw}
+  .wrap{max-width:1080px;margin:0 auto}
+  .eyebrow{
+    font-size:13px;font-weight:800;letter-spacing:.22em;color:var(--accent);
+    display:flex;align-items:center;gap:8px;margin-bottom:18px;
+  }
+  .eyebrow .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);animation:pulse 1.6s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+  @media (prefers-reduced-motion: reduce){.eyebrow .dot{animation:none}}
+  h1{font-size:clamp(38px,6vw,68px);font-weight:800;line-height:1.08;letter-spacing:-.01em;color:var(--paper)}
+  h2{font-size:clamp(26px,3.4vw,40px);font-weight:800;letter-spacing:-.005em;color:var(--paper);margin-bottom:14px}
+  p.lead{font-size:clamp(17px,2vw,21px);color:var(--qgray);max-width:62ch}
+  .accent-word{color:var(--accent)}
+
+  /* ── nav ── */
+  header{
+    position:sticky;top:0;z-index:20;
+    display:flex;align-items:center;gap:14px;
+    padding:16px 6vw;
+    background:rgba(10,20,48,.86);backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--line);
+  }
+  header .prod{font-size:14px;font-weight:800;letter-spacing:.14em;color:var(--paper)}
+  header nav{margin-left:auto;display:flex;gap:28px}
+  header nav a{color:var(--dim);text-decoration:none;font-size:14px;font-weight:600}
+  header nav a:hover{color:var(--paper)}
+  .btn{
+    border:1.5px solid var(--accent);color:var(--accent);background:transparent;
+    padding:9px 18px;border-radius:9px;font-weight:700;font-size:14px;
+    cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:8px;
+  }
+  .btn:hover{background:var(--accent);color:var(--bg)}
+  .btn.solid{background:var(--accent);color:var(--bg)}
+  .btn.solid:hover{background:#6fb6ff;border-color:#6fb6ff}
+
+  /* ── hero ── */
+  #hero{padding-top:clamp(64px,12vh,130px)}
+  #hero .lead{margin-top:20px}
+  .hero-ctas{display:flex;gap:14px;margin-top:32px;flex-wrap:wrap}
+  .hero-stats{display:flex;gap:clamp(24px,4vw,56px);margin-top:56px;flex-wrap:wrap}
+  .stat b{display:block;font-size:clamp(32px,4vw,48px);font-weight:800;color:var(--amber)}
+  .stat span{font-size:13px;color:var(--dim);letter-spacing:.02em}
+
+  /* ── pain strip ── */
+  #pain{background:var(--bg2);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .pain-grid{display:grid;grid-template-columns:1fr 1fr;gap:28px}
+  .pain-card{background:var(--panel);border-radius:16px;padding:28px}
+  .pain-card .tag{font-size:12px;font-weight:800;letter-spacing:.16em;margin-bottom:10px}
+  .pain-card.bad .tag{color:var(--faint)}
+  .pain-card.good .tag{color:var(--accent)}
+  .pain-card .line{font-size:clamp(20px,2.4vw,26px);font-weight:700;color:var(--paper)}
+  .pain-card .sub{margin-top:8px;color:var(--dim);font-size:14px}
+  @media (max-width:760px){.pain-grid{grid-template-columns:1fr}}
+
+  /* ── how it works ── */
+  .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;margin-top:36px}
+  .step{background:var(--panel);border-radius:14px;padding:22px;border:1px solid var(--line)}
+  .step .n{
+    width:32px;height:32px;border-radius:9px;background:var(--line);color:var(--accent);
+    display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;margin-bottom:14px;
+  }
+  .step h3{font-size:16px;font-weight:800;margin-bottom:8px;color:var(--paper)}
+  .step p{font-size:13.5px;color:var(--dim)}
+  @media (max-width:900px){.steps{grid-template-columns:1fr 1fr}}
+  @media (max-width:520px){.steps{grid-template-columns:1fr}}
+
+  /* ── demo mock ── */
+  #demo{background:var(--bg2);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .demo-shell{
+    margin-top:36px;background:var(--bg);border-radius:18px;overflow:hidden;
+    box-shadow:0 24px 60px rgba(0,0,0,.45);border:1px solid var(--line);
+  }
+  .demo-shell .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--line)}
+  .demo-shell .prod{font-size:12px;font-weight:800;letter-spacing:.12em;color:var(--accent)}
+  .demo-shell .live{margin-left:auto;display:flex;align-items:center;gap:7px;font-size:11px;font-weight:800;letter-spacing:.16em;color:var(--accent)}
+  .demo-shell .live .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);animation:pulse 1.6s infinite}
+  .demo-body{padding:clamp(20px,3vw,34px);min-height:280px}
+  .demo-q{font-size:12px;font-weight:700;letter-spacing:.16em;color:var(--faint);margin-bottom:8px}
+  .demo-qtext{font-size:clamp(18px,2.2vw,24px);color:var(--qgray);font-weight:500;margin-bottom:26px}
+  .demo-chips{display:flex;flex-wrap:wrap;gap:14px}
+  .demo-chip{
+    border:2.5px solid #FFFFFF;background:var(--chipbg);color:#fff;border-radius:14px;
+    padding:14px 22px;font-size:clamp(20px,2.6vw,28px);font-weight:800;box-shadow:0 4px 18px rgba(0,0,0,.35);
+  }
+  .demo-src{margin-top:22px;font-size:13px;color:var(--dim)}
+  .demo-src b{color:var(--accent)}
+  .demo-empty{display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-height:220px;color:var(--faint)}
+  .demo-empty .big{font-size:clamp(20px,2.6vw,28px);font-weight:800;letter-spacing:.04em}
+  .demo-empty .why{font-size:13px;letter-spacing:.1em;font-weight:700}
+  .demo-shell.is-empty .demo-chips,.demo-shell.is-empty .demo-src{display:none}
+  .demo-shell.is-empty .demo-empty{display:flex}
+  .demo-foot{display:flex;align-items:center;gap:22px;padding:12px 20px;border-top:1px solid var(--line);font-size:12.5px;color:var(--dim)}
+  .demo-foot b{color:var(--amber)}
+  .demo-toggle{margin-left:auto;display:flex;gap:8px}
+  .demo-toggle button{
+    background:none;border:1px solid var(--line);border-radius:8px;color:var(--dim);
+    font-size:12px;font-weight:700;padding:7px 12px;cursor:pointer;font-family:inherit;
+  }
+  .demo-toggle button.on{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+
+  /* ── silence philosophy ── */
+  .silence-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:44px;align-items:center;margin-top:36px}
+  .silence-box{
+    border:2px dashed #3E4D6C;border-radius:16px;background:var(--panel);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+    padding:44px 20px;
+  }
+  .silence-box b{font-size:clamp(20px,2vw,26px);color:var(--faint);font-weight:800}
+  .silence-box span{font-size:12px;letter-spacing:.12em;font-weight:700;color:var(--faint)}
+  .silence-copy ul{list-style:none;margin-top:18px}
+  .silence-copy li{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);color:var(--dim);font-size:14.5px}
+  .silence-copy li b{color:var(--paper);min-width:11ch}
+  @media (max-width:820px){.silence-grid{grid-template-columns:1fr}}
+
+  /* ── footer ── */
+  footer{padding:40px 6vw;border-top:1px solid var(--line);display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  footer .prod{font-size:13px;font-weight:800;letter-spacing:.12em;color:var(--dim)}
+  footer .note{margin-left:auto;font-size:12.5px;color:var(--faint)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="prod">LIVE ANSWER CARD</div>
+  <nav>
+    <a href="#how">How it works</a>
+    <a href="#demo">Demo</a>
+    <a href="#silence">Why silence</a>
+  </nav>
+  <a class="btn solid" href="#demo" style="margin-left:8px">See it work</a>
+</header>
+
+<section id="hero">
+  <div class="wrap">
+    <div class="eyebrow"><span class="dot"></span>LIVE ON EVERY CALL</div>
+    <h1>The answer shows up<br>before you have to say<br><span class="accent-word">"let me check."</span></h1>
+    <p class="lead">
+      A prospect asks a technical question mid-call. Live Answer Card listens, finds the
+      grounded answer in your product docs, and puts two or three glanceable keywords on a
+      teammate's second screen — before the silence gets awkward.
+    </p>
+    <div class="hero-ctas">
+      <a class="btn solid" href="#demo">Watch the mock demo</a>
+      <a class="btn" href="#how">How it decides</a>
+    </div>
+    <div class="hero-stats">
+      <div class="stat"><b>~3s</b><span>utterance to rendered card</span></div>
+      <div class="stat"><b>2–3</b><span>keywords, never a paragraph</span></div>
+      <div class="stat"><b>0.6</b><span>confidence floor to show anything</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="pain">
+  <div class="wrap">
+    <h2>Slow doesn't mean worse here. It means the product doesn't exist.</h2>
+    <p class="lead" style="margin-bottom:30px">
+      There's a real window — the gap before a rep has to say something back. Miss it, and
+      the deal takes the hit.
+    </p>
+    <div class="pain-grid">
+      <div class="pain-card good">
+        <div class="tag">WITH LIVE ANSWER CARD · 2s</div>
+        <div class="line">Rep glances, says it out loud. Call keeps moving.</div>
+        <div class="sub">The teammate's screen already has the answer.</div>
+      </div>
+      <div class="pain-card bad">
+        <div class="tag">WITHOUT IT · 6s</div>
+        <div class="line">"Let me check and get back to you."</div>
+        <div class="sub">That sentence is where deals go quiet.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <div class="eyebrow">HOW IT WORKS</div>
+    <h2>Four small decisions, running in under three seconds.</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="n">1</div>
+        <h3>Listen</h3>
+        <p>Both sides of the call are transcribed live. Nothing waits on the rep to type anything.</p>
+      </div>
+      <div class="step">
+        <div class="n">2</div>
+        <h3>Decide</h3>
+        <p>Small talk, pricing, and scheduling never fire the card. Only real technical questions do.</p>
+      </div>
+      <div class="step">
+        <div class="n">3</div>
+        <h3>Answer</h3>
+        <p>Grounded retrieval over your product docs — never a guess, always a cited source.</p>
+      </div>
+      <div class="step">
+        <div class="n">4</div>
+        <h3>Show — or stay quiet</h3>
+        <p>Confident enough, the card renders. Not confident enough, the screen stays deliberately empty.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="demo">
+  <div class="wrap">
+    <div class="eyebrow">MOCK PREVIEW</div>
+    <h2>What the teammate sees</h2>
+    <p class="lead">Big words, no scrolling, nothing to read aloud from a paragraph.</p>
+
+    <div class="demo-shell" id="demoShell">
+      <div class="bar">
+        <div class="prod">LIVE ANSWER CARD</div>
+        <div class="live"><span class="dot"></span>LISTENING</div>
+      </div>
+      <div class="demo-body">
+        <div>
+          <div class="demo-q">PROSPECT</div>
+          <div class="demo-qtext" id="demoQ">“Are you guys SOC 2 certified?”</div>
+          <div class="demo-chips" id="demoChips">
+            <div class="demo-chip">SOC 2 — YES</div>
+            <div class="demo-chip">TYPE II</div>
+            <div class="demo-chip">NDA → REPORT</div>
+          </div>
+          <div class="demo-src" id="demoSrc">Source: <b>security-overview.md · §1.1</b></div>
+        </div>
+        <div class="demo-empty">
+          <div class="big">— nothing —</div>
+          <div class="why" id="demoWhy">NOT A TECHNICAL QUESTION · SCREEN STAYS QUIET</div>
+        </div>
+      </div>
+      <div class="demo-foot">
+        <div id="demoConf">confidence <b>0.91</b> · answer in 1.8s</div>
+        <div class="demo-toggle" id="demoToggle"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="silence">
+  <div class="wrap">
+    <div class="eyebrow">THE DECISION LAYER</div>
+    <h2>A wrong keyword is worse than a blank screen.</h2>
+    <div class="silence-grid">
+      <div class="silence-copy">
+        <p class="lead">
+          Answering is the easy half. Deciding when to say nothing at all is what keeps a rep
+          trusting the screen enough to glance at it mid-call.
+        </p>
+        <ul>
+          <li><b>Small talk</b>stays off the screen, on purpose.</li>
+          <li><b>Pricing</b>is the rep's conversation to have, not ours to interrupt.</li>
+          <li><b>Low confidence</b>never becomes a guess dressed up as an answer.</li>
+        </ul>
+      </div>
+      <div class="silence-box">
+        <b>— nothing —</b>
+        <span>SMALL TALK · PRICING · LOW CONFIDENCE</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="prod">LIVE ANSWER CARD</div>
+  <div class="note">Hackathon mock — sample data only, no real customer content.</div>
+</footer>
+
+<script>
+const SCENES = [
+  {
+    label: "SOC 2",
+    q: "“Are you guys SOC 2 certified?”",
+    fired: true, conf: "0.91", lat: "1.8s",
+    chips: ["SOC 2 — YES", "TYPE II", "NDA → REPORT"],
+    src: "Source: <b>security-overview.md · §1.1</b>"
+  },
+  {
+    label: "Data residency",
+    q: "“Where does our data actually live? We need EU-only.”",
+    fired: true, conf: "0.87", lat: "2.1s",
+    chips: ["EU — YES", "NO US TRANSIT", "DPA READY"],
+    src: "Source: <b>data-residency.md · §2</b>"
+  },
+  {
+    label: "Small talk",
+    q: "“Haha yeah, the weather's been crazy over here too.”",
+    fired: false, why: "NOT A TECHNICAL QUESTION · SCREEN STAYS QUIET"
+  },
+  {
+    label: "Low confidence",
+    q: "“Does it integrate with our internal ticketing tool, Zentrix?”",
+    fired: false, why: "CONFIDENCE 0.34 — BELOW THRESHOLD · BETTER SILENT THAN WRONG"
+  }
+];
+
+const shell = document.getElementById('demoShell'),
+      qEl = document.getElementById('demoQ'),
+      chipsEl = document.getElementById('demoChips'),
+      srcEl = document.getElementById('demoSrc'),
+      whyEl = document.getElementById('demoWhy'),
+      confEl = document.getElementById('demoConf'),
+      toggleEl = document.getElementById('demoToggle');
+
+function showScene(i) {
+  const s = SCENES[i];
+  [...toggleEl.children].forEach((b, j) => b.classList.toggle('on', j === i));
+  qEl.textContent = s.q;
+  shell.classList.toggle('is-empty', !s.fired);
+  if (s.fired) {
+    chipsEl.innerHTML = s.chips.map(c => `<div class="demo-chip">${c}</div>`).join('');
+    srcEl.innerHTML = s.src;
+    confEl.innerHTML = `confidence <b>${s.conf}</b> · answer in ${s.lat}`;
+  } else {
+    whyEl.textContent = s.why;
+    confEl.innerHTML = `confidence <b>below 0.6</b> · screen stays quiet`;
+  }
+}
+
+SCENES.forEach((s, i) => {
+  const b = document.createElement('button');
+  b.textContent = s.label;
+  b.onclick = () => showScene(i);
+  toggleEl.appendChild(b);
+});
+showScene(0);
+</script>
+</body>
+</html>

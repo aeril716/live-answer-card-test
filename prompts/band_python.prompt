@@ -1,0 +1,93 @@
+% band_python.prompt — Band audit stream for fire/no-fire decisions
+% Converted from issue #5 (Lane 3). Optional feature behind a flag; the
+% classifier itself lives in trigger_python.prompt.
+
+<include>context/project_preamble.prompt</include>
+
+MODULE
+
+Write `band.py`. Every fire/no-fire decision made during a call is published
+to a Band room as an audit record, without adding any latency to the answer
+path. The trigger module already produces this data as per-utterance debug
+output; this module sends the same records to a shared Band room as well.
+
+The result is a live audit trail of what the assistant surfaced during a
+call and why:
+
+    FIRED      "Are you SOC 2 certified?"     technical   conf 0.91   security-overview.md §1.1
+    SILENT     "How was your weekend?"        smalltalk   —
+    SILENT     "How much is the Team plan?"   smalltalk   — (pricing excluded by design)
+    SILENT     "Are you SOC 2 compliant?"     repeat      — answered at 00:04:12
+
+In regulated sales, what a rep claimed and what backed the claim is a real
+audit question; a compliance reviewer opening the room after the call is the
+intended use.
+
+INTERFACE
+
+`should_fire()`'s frozen contract is unchanged — this module never alters its
+return value. Within `band.py`, expose one non-blocking enqueue function
+called from the trigger path and a background thread that drains the queue to
+Band. The exact function signature is the generator's choice; explain it in
+the PR description.
+
+THE GOVERNING CONSTRAINT
+
+The answer path must not get slower. The product's entire argument is the
+3-second budget; a network hop on the hot path is wrong by definition.
+
+- Publishing is fire-and-forget: records go onto an in-memory queue; a
+  background thread drains it.
+- The queue push is non-blocking and completes in well under 1 ms.
+- If the queue is full, drop the record. Never block, never grow unbounded.
+- If Band is unreachable, unauthenticated, slow, or throwing, the call loop
+  behaves exactly as if this feature did not exist.
+
+BEHAVIOR
+
+1. Given `USE_BAND = False` (the default), when the system runs, then no Band
+   code executes and no Band dependency is imported at call time.
+2. Given `USE_BAND = True` and a firing decision, when `should_fire()`
+   returns, then an audit record is enqueued and the function returns without
+   waiting for any network call.
+3. Given `USE_BAND = True` and a non-firing decision, then a record is
+   enqueued with the reason (`smalltalk`, `repeat`, `not_a_question`).
+4. Given the Band endpoint is unreachable, when 20 utterances are processed,
+   then all 20 still produce correct decisions and the loop never blocks or
+   raises.
+5. Given the publish queue is full, when a new record arrives, then it is
+   dropped and a single warning is printed — the queue never grows without
+   bound.
+6. Given a completed call, when the Band room is opened, then it contains one
+   record per utterance in order, each showing the utterance, the decision,
+   the reason, and for fired decisions the confidence and source.
+7. Given `USE_BAND = True`, when end-to-end latency is measured over 20
+   utterances, then the median is within 5 ms of the same run with
+   `USE_BAND = False`. This criterion governs: if it fails, the feature is
+   wrong regardless of how the room looks.
+
+Band credentials and the room identifier come from `.env`, following the same
+rules as every other credential.
+
+MUST NOT
+
+- Must not add any blocking call to `should_fire()`.
+- Must not raise, ever — Band failures are logged and swallowed.
+- Must not change the `should_fire()` contract; its return value is
+  unchanged.
+- Must not put customer question text into the room when a
+  `REDACT_QUESTIONS` flag is set — publish the decision and reason only.
+- Must not require Band to be running for any test to pass.
+- Must not be a dependency of the rest of the system: with the flag off, the
+  application is unaffected in every way.
+
+VALIDATION
+
+- Test: `pytest tests/test_band.py -q` — runs with no network, using a fake
+  publisher, and asserts criteria 1 through 5.
+- Manual: run the three demo questions plus two small-talk lines with
+  `USE_BAND = True` and confirm five records appear in the room.
+- Manual: kill the network and confirm the application behaves identically.
+- Done when: the flag defaults to off and the system is unaffected either
+  way, the latency delta is measured rather than assumed, and the room shows
+  both fired and silent decisions.
