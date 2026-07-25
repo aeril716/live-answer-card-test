@@ -38,6 +38,13 @@ still just please sorry one sec us have had has get got were was and support
 
 _PRODUCTS = ("gateway", "traces", "evals")
 
+# Words that open a question when STT drops the "?" — statements and
+# back-channel virtually never start with these.
+_QUESTION_STARTERS = frozenset("""
+are is do does did can could would will what how when where who which why
+whats hows
+""".split())
+
 _TECH_KEYWORDS = (
     "soc 2", "soc2", "type i", "type ii", "sso", "saml", "scim", "sla",
     "uptime", "retention", "retain", "log", "logs", "encrypt", "self-host",
@@ -196,7 +203,11 @@ def should_fire(utterance: dict) -> dict:
         speaker = utterance.get("speaker", "unknown")
 
         # Gate 1 — question: rep speech, statements, back-channel. No model call.
-        if speaker == "rep" or "?" not in text:
+        # STT transcripts often arrive without punctuation, so a leading
+        # interrogative/auxiliary word also counts as question-shaped.
+        first_word = _normalize(text).split()[0] if _normalize(text) else ""
+        question_shaped = "?" in text or first_word in _QUESTION_STARTERS
+        if speaker == "rep" or not question_shaped:
             result = dict(EMPTY)
             _debug("question", result["reason"], text)
         # Gate 2 — repeat: before any model call.
