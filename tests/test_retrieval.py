@@ -9,6 +9,7 @@ import importlib
 
 import pytest
 
+import model_client as model_client_mod
 import retrieval
 
 
@@ -136,6 +137,51 @@ def test_confidence_below_knee_stays_below_threshold():
 
 
 # --------------------------------------------------------------------------
+# Keyword generation: heading fallback (pure, offline).
+# --------------------------------------------------------------------------
+
+_CHUNK = (
+    "Vantic — Security Overview — §1.1 SOC 2\n"
+    "Vantic holds SOC 2 Type II across all three products, renewed in March 2026."
+)
+
+
+def test_heading_keywords_are_grounded_and_bounded():
+    kws = retrieval._heading_keywords("Are you SOC 2 certified?", _CHUNK)
+    assert 1 <= len(kws) <= 3
+    body = _CHUNK.lower()
+    for kw in kws:
+        assert kw == kw.upper()
+        assert any(w in body for w in kw.lower().split() if len(w) >= 3)
+
+
+def test_heading_topic_anchors_the_keywords():
+    # The section heading topic ("SOC 2") is always present as the anchor.
+    kws = retrieval._heading_keywords("Are you SOC 2 certified?", _CHUNK)
+    assert any("SOC 2" in kw for kw in kws)
+
+
+def test_empty_completion_falls_back_to_heading(monkeypatch):
+    monkeypatch.setattr(model_client_mod, "fast_complete", lambda *a, **k: "")
+    kws, detail = retrieval._keywords_and_detail(
+        "Are you SOC 2 certified?", {"text": _CHUNK, "source": "security-overview.md §1.1"}
+    )
+    assert kws, "empty completion must still yield heading-based keywords"
+    assert any("SOC 2" in kw for kw in kws)
+
+
+def test_ungrounded_model_output_is_rejected(monkeypatch):
+    # A confident-looking but ungrounded completion must not become the card.
+    monkeypatch.setattr(model_client_mod, "fast_complete",
+                        lambda *a, **k: "DATABRICKS | KUBERNETES | BLOCKCHAIN")
+    kws, _ = retrieval._keywords_and_detail(
+        "Are you SOC 2 certified?", {"text": _CHUNK, "source": "security-overview.md §1.1"}
+    )
+    assert kws
+    assert not any(w in " ".join(kws) for w in ("DATABRICKS", "KUBERNETES", "BLOCKCHAIN"))
+
+
+# --------------------------------------------------------------------------
 # Real search path — skipped when the store is absent so offline stays green.
 # --------------------------------------------------------------------------
 
@@ -182,6 +228,24 @@ def test_acceptance_questions_real_path(monkeypatch, question, exp_doc, exp_sect
 def test_soc2_exact_section_real_path(monkeypatch):
     monkeypatch.setattr(retrieval, "USE_MOCK", False)
     assert retrieval.answer("Are you SOC 2 certified?")["source"] == "security-overview.md §1.1"
+
+
+@real_store
+def test_retention_discriminates_by_product_real_path(monkeypatch):
+    # Backs story__retention_answer_matches_the_product: the same-shaped question
+    # returns a different number per product, and never the wrong one.
+    monkeypatch.setattr(retrieval, "USE_MOCK", False)
+    traces = retrieval.answer("How long do you retain trace data?")
+    gateway = retrieval.answer("How long does Gateway keep request logs?")
+
+    traces_txt = " ".join(traces["keywords"]) + " " + traces["detail"]
+    gateway_txt = " ".join(gateway["keywords"]) + " " + gateway["detail"]
+
+    assert traces["source"] == "security-overview.md §3"
+    assert gateway["source"] == "security-overview.md §3"
+    assert "90" in traces_txt and "7" in gateway_txt
+    # The Gateway card must not lead with the Traces number.
+    assert not gateway["keywords"][0].startswith("90")
 
 
 @real_store

@@ -18,14 +18,13 @@ USE_MOCK = True (the default) returns hand-authored cards with zero network, so
 every test runs offline. USE_MOCK = False runs the real path: ingest.search()
 over the persisted corpus store, then keyword generation.
 
-Keyword generation deviates deliberately from prompts/retrieval_python.prompt
-and this is called out in the PR: the prompt describes model-generated keywords.
-Here the model (model_client.fast_complete) is used when a real one is
-configured, but keywords are ALWAYS grounded in and can fall back to the
-retrieved passage. A grounded deterministic extractor is the floor. Rationale:
-"a wrong keyword is much worse than a blank one" — an ungrounded model keyword
-is exactly the failure this product cannot have, and the offline/mock model
-returns a placeholder string that must never become a card.
+Keyword generation is model-first with a passage-grounded floor: fast_complete()
+is called for punchier labels, but any keyword not literally grounded in the
+retrieved passage is dropped. When the model returns "" (any provider failure or
+timeout) or nothing grounded survives, keywords are built from the top chunk's
+HEADING instead — the section topic is a guaranteed, correct anchor. Rationale:
+"a wrong keyword is much worse than a blank one" — an ungrounded model keyword is
+exactly the failure this product cannot have.
 """
 
 import re
@@ -129,11 +128,11 @@ def _shorten(phrase: str, limit: int = 24) -> str:
     return cut.strip(" .,:;—-")
 
 
-def _candidate_phrases(text: str):
-    """Ordered candidate keyphrases pulled from a retrieved chunk.
+def _heading_and_body(text: str):
+    """Split a chunk into (heading_title, body).
 
-    The corpus bolds its key facts and renders table rows as ``k: v; k: v``;
-    both are mined here so every keyword is literally present in the passage.
+    Chunk line 1 is ``<doc> — §<N> <Section Title>``; the section title is the
+    passage's topic and the anchor for heading-based keywords.
     """
     lines = text.split("\n")
     heading_title = ""
@@ -141,6 +140,16 @@ def _candidate_phrases(text: str):
     if m:
         heading_title = m.group(1).split("—")[0].strip()
     body = "\n".join(lines[1:]) if len(lines) > 1 else text
+    return heading_title, body
+
+
+def _candidate_phrases(text: str):
+    """Ordered candidate keyphrases pulled from a retrieved chunk.
+
+    The corpus bolds its key facts and renders table rows as ``k: v; k: v``;
+    both are mined here so every keyword is literally present in the passage.
+    """
+    heading_title, body = _heading_and_body(text)
 
     cands = []
     # Row-rendered "key: value" cells -> the value is the fact.
@@ -167,8 +176,17 @@ def _candidate_phrases(text: str):
     return out
 
 
-def _deterministic_keywords(question: str, text: str):
-    """Grounded keywords straight from the passage; the reliable floor."""
+def _heading_keywords(question: str, text: str):
+    """Keywords built from the top chunk's HEADING, enriched with grounded facts.
+
+    This is the fallback the moment the model is unavailable — fast_complete()
+    returns "" on any provider failure, and mock/ungrounded output is rejected.
+    The section heading is the guaranteed topical anchor (so a confident card is
+    never keyword-less); bolded facts, durations and table-cell values from the
+    passage carry the actual answer and rank ahead of the heading by overlap
+    with the question. Every keyword is literally present in the passage.
+    """
+    heading_title, _ = _heading_and_body(text)
     qtok = _q_tokens(question)
     cands = _candidate_phrases(text)
 
@@ -176,18 +194,28 @@ def _deterministic_keywords(question: str, text: str):
         ptok = set(re.split(r"[^a-z0-9]+", phrase.lower()))
         overlap = len(qtok & ptok)
         has_num = 1 if re.search(r"\d", phrase) else 0
-        return (overlap, has_num, -len(phrase))
+        is_heading = 1 if phrase.strip().lower() == heading_title.lower() else 0
+        # answer-carrying facts first; the heading is the guaranteed floor, not
+        # the lead, so it sorts last among ties.
+        return (overlap, has_num, -is_heading, -len(phrase))
 
     ranked = sorted(cands, key=score, reverse=True)
     picked, seen = [], set()
+    # Guarantee the heading topic is present so the card is always heading-rooted.
+    heading_kw = _shorten(heading_title).upper() if heading_title else ""
     for p in ranked:
         up = p.upper()
-        if up not in seen:
+        if up and up not in seen:
             seen.add(up)
             picked.append(up)
         if len(picked) >= MAX_KEYWORDS:
             break
-    return picked
+    if heading_kw and heading_kw not in seen:
+        if len(picked) < MAX_KEYWORDS:
+            picked.append(heading_kw)
+        else:
+            picked[-1] = heading_kw
+    return picked[:MAX_KEYWORDS]
 
 
 def _parse_model_keywords(raw: str):
@@ -218,8 +246,8 @@ def _grounded(keyword: str, text: str) -> bool:
 
 def _keywords_and_detail(question: str, top: dict):
     text = top.get("text", "")
+    _, body = _heading_and_body(text)
     # Detail: first grounded sentence of the body (drop the heading context line).
-    body = "\n".join(text.split("\n")[1:]) if "\n" in text else text
     body = re.sub(r"\s+", " ", body.replace("*", "")).strip()
     detail = ""
     for sent in re.split(r"(?<=[.!?])\s+", body):
@@ -228,24 +256,26 @@ def _keywords_and_detail(question: str, top: dict):
             break
     detail = detail[:200]
 
-    keywords = _deterministic_keywords(question, text)
+    # Model first: fast_complete() phrases punchier labels when a real model is
+    # configured. It returns "" on any failure/timeout (and a placeholder in mock
+    # mode); either way, ungrounded output is rejected below.
+    keywords = []
+    try:
+        prompt = (
+            "You label a sales-call answer screen. From the passage, give 2-3 "
+            "SHORT keyword labels (<=4 words each), pipe-separated, uppercase, "
+            "the FIRST label stating the answer. No sentences.\n"
+            f"Question: {question}\nPassage: {text}\nLabels:"
+        )
+        raw = model_client.fast_complete(prompt, max_tokens=40)
+        keywords = [k for k in _parse_model_keywords(raw) if _grounded(k, text)]
+    except Exception as exc:
+        print(f"[retrieval] keyword-model error: {exc}")
 
-    # If a real model is configured, let it phrase punchier keywords — but only
-    # keep ones grounded in the passage, and never fewer/worse than the floor.
-    if not getattr(model_client, "USE_MOCK", True):
-        try:
-            prompt = (
-                "You label a sales-call answer screen. From the passage, give 2-3 "
-                "SHORT keyword labels (<=4 words each), pipe-separated, uppercase, "
-                "the FIRST label stating the answer. No sentences.\n"
-                f"Question: {question}\nPassage: {text}\nLabels:"
-            )
-            raw = model_client.fast_complete(prompt, max_tokens=40)
-            model_kw = [k for k in _parse_model_keywords(raw) if _grounded(k, text)]
-            if model_kw:
-                keywords = model_kw
-        except Exception as exc:
-            print(f"[retrieval] keyword-model error: {exc}")
+    # No usable model keywords (empty completion, mock placeholder, or all
+    # ungrounded) -> build them from the top chunk's heading instead.
+    if not keywords:
+        keywords = _heading_keywords(question, text)
 
     return keywords[:MAX_KEYWORDS], detail
 
