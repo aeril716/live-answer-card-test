@@ -11,7 +11,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-USE_MOCK: bool = False
+# Mock by default — safe everywhere (tests, Render, fresh clones). The demo
+# laptop goes live by putting AUDIO_USE_MOCK=false in its .env; no code edit.
+USE_MOCK: bool = os.environ.get("AUDIO_USE_MOCK", "true").strip().lower() \
+    not in ("0", "false", "no", "off")
 EMPTY: Dict[str, Any] = {"text": "", "speaker": "unknown", "ts": 0.0}
 
 _MOCK_UTTERANCES: List[Dict[str, Any]] = [
