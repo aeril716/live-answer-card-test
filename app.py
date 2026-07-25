@@ -56,18 +56,17 @@ def process_utterance(mods, utterance):
         return None
 
 
-def _draw_card(st, card):
-    # Minimal in-page card until Lane 4's Streamlit renderer replaces it;
-    # same 0.6 rule as screen.render.
+def _card_markdown(card):
+    # One single markdown block: st.empty() replaces one element atomically,
+    # which avoids ghost fragments from partially-replaced multi-element cards.
     card = card or {}
     keywords = [str(k) for k in card.get("keywords", [])][:3]
     if card.get("confidence", 0.0) >= CONFIDENCE_THRESHOLD and keywords:
-        for kw in keywords:
-            st.markdown(f"## {kw.upper()}")
-        st.caption(f"{card.get('detail', '')}  \n{card.get('source', '')}")
-    else:
-        st.markdown("## —")
-        st.caption("listening…")
+        body = "\n\n".join(f"## {kw.upper()}" for kw in keywords)
+        detail = card.get("detail", "")
+        source = card.get("source", "")
+        return f"{body}\n\n*{detail}*  \n`{source}`"
+    return "## —\n\n*listening…*"
 
 
 def _run_app():
@@ -88,7 +87,7 @@ def _run_app():
         if q:
             card = mods["retrieval"].answer(q)
             mods["screen"].render(card)
-            _draw_card(st, card)
+            st.markdown(_card_markdown(card))
 
     else:  # Live
         col_a, col_b = st.sidebar.columns(2)
@@ -102,8 +101,8 @@ def _run_app():
             st.session_state.running = False
 
         placeholder = st.empty()
-        with placeholder.container():
-            _draw_card(st, None)
+        placeholder.markdown(_card_markdown(None))
+        mock_audio = getattr(mods["audio"], "USE_MOCK", False)
         empties = 0
         while st.session_state.running:
             u = mods["audio"].get_utterance()
@@ -118,8 +117,9 @@ def _run_app():
             card = process_utterance(mods, u)
             if card is not None:
                 mods["screen"].render(card)
-                with placeholder.container():
-                    _draw_card(st, card)
+                placeholder.markdown(_card_markdown(card))
+            if mock_audio:
+                time.sleep(2.0)  # pace the replayed call so cards are watchable
 
 
 def _streamlit_active():
