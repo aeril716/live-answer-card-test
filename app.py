@@ -6,6 +6,7 @@ Typed (microphone-failure fallback). Missing modules are replaced by stubs
 returning their frozen EMPTY values so the app always boots. (issue #13)
 """
 import importlib
+import threading
 import time
 from types import SimpleNamespace
 
@@ -165,6 +166,14 @@ def _run_app():
     st.set_page_config(page_title="Live Answer Card", page_icon="📇")
     st.markdown(_CARD_CSS, unsafe_allow_html=True)
     mods, missing = load_modules()
+
+    if "retrieval" not in missing and not st.session_state.get("warmed"):
+        # first real search pays the embedding-model load (~seconds); warm it
+        # in the background so the first spoken question answers fast
+        st.session_state.warmed = True
+        threading.Thread(
+            target=lambda: mods["retrieval"].answer("warm up the index"),
+            daemon=True).start()
 
     st.sidebar.title("Live Answer Card")
     st.sidebar.markdown("[← Back to landing page](https://live-answer-card-landing.onrender.com)")

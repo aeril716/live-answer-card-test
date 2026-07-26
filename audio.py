@@ -79,6 +79,7 @@ def _ws_worker() -> None:
             ws = websocket.create_connection(url, timeout=10)
 
             stop_flag = threading.Event()
+            last_partial = ""
 
             def _on_audio(indata, frames, time_info, status):
                 try:
@@ -113,12 +114,27 @@ def _ws_worker() -> None:
                     continue
 
                 msg_type = msg.get("message_type", msg.get("type", ""))
-                if msg_type in ("partial_transcript", "session_started"):
-                    continue  # discard partials per spec
+                if msg_type == "session_started":
+                    continue
+                if msg_type == "partial_transcript":
+                    # latency cut: a partial that already ends with "?" is a
+                    # finished question — dispatch now instead of waiting for
+                    # the VAD commit (~1-2s). The later committed copy is
+                    # skipped below.
+                    text = (msg.get("text") or "").strip()
+                    if text.endswith("?") and text != last_partial:
+                        last_partial = text
+                        _queue.put({"text": text,
+                                    "speaker": msg.get("speaker", "unknown") or "unknown",
+                                    "ts": time.time() - _session_start})
+                    continue
                 if msg_type in ("committed_transcript", "final_transcript"):
                     text = msg.get("text", "")
                     if not text:
                         continue
+                    if text.strip() == last_partial:
+                        last_partial = ""
+                        continue  # already dispatched from the partial
                     speaker = msg.get("speaker", "unknown") or "unknown"
                     ts = time.time() - _session_start
                     _queue.put({"text": text, "speaker": speaker, "ts": ts})
