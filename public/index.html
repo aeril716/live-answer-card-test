@@ -62,9 +62,29 @@
   .btn.solid{background:var(--accent);color:var(--bg)}
   .btn.solid:hover{background:#6fb6ff;border-color:#6fb6ff}
 
-  /* ── hero ── */
-  #hero{padding-top:clamp(64px,12vh,130px)}
-  #hero .lead{margin-top:20px}
+  /* ── hero video banner ── */
+  #hero{
+    position:relative;min-height:min(80vh,760px);
+    display:flex;align-items:center;padding:0;overflow:hidden;
+  }
+  .hero-video{
+    position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    min-width:100%;min-height:100%;width:auto;height:auto;
+    object-fit:cover;z-index:0;
+  }
+  .hero-overlay{
+    position:absolute;inset:0;z-index:1;
+    background:linear-gradient(180deg, rgba(10,20,48,.35) 0%, rgba(10,20,48,.65) 65%, rgba(10,20,48,.92) 100%);
+  }
+  #hero .wrap{position:relative;z-index:2}
+  #hero h1{text-shadow:0 6px 30px rgba(0,0,0,.55)}
+  @media (prefers-reduced-motion: reduce){
+    .hero-video{display:none}
+    #hero{background:linear-gradient(180deg, var(--bg2), var(--bg))}
+  }
+
+  /* ── hero details (below the video banner) ── */
+  #hero-details .eyebrow{margin-bottom:18px}
   .hero-ctas{display:flex;gap:14px;margin-top:32px;flex-wrap:wrap}
   .hero-stats{display:flex;gap:clamp(24px,4vw,56px);margin-top:56px;flex-wrap:wrap}
   .stat b{display:block;font-size:clamp(32px,4vw,48px);font-weight:800;color:var(--amber)}
@@ -160,9 +180,18 @@
 </header>
 
 <section id="hero">
+  <video class="hero-video" autoplay muted loop playsinline aria-hidden="true">
+    <source src="hero-bg.mp4" type="video/mp4">
+  </video>
+  <div class="hero-overlay"></div>
+  <div class="wrap">
+    <h1>The answer shows up<br>before you have to say<br><span class="accent-word">"let me check."</span></h1>
+  </div>
+</section>
+
+<section id="hero-details">
   <div class="wrap">
     <div class="eyebrow"><span class="dot"></span>LIVE ON EVERY CALL</div>
-    <h1>The answer shows up<br>before you have to say<br><span class="accent-word">"let me check."</span></h1>
     <p class="lead">
       A prospect asks a technical question mid-call. Live Answer Card listens, finds the
       grounded answer in your product docs, and puts two or three glanceable keywords on a
