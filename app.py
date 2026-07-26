@@ -263,8 +263,9 @@ def _run_app():
                     idx = i
                     st.session_state.scene = i
             item = hist[idx]
-            tabs = [(_scene_label(i, h), i == idx) for i, h in enumerate(hist)]
-            placeholder.markdown(_card_markdown(item["card"], item["q"], tabs),
+            # stopped view: the clickable buttons below are the tabs — skip
+            # the in-card visual strip so they don't show twice
+            placeholder.markdown(_card_markdown(item["card"], item["q"]),
                                  unsafe_allow_html=True)
 
 
