@@ -14,6 +14,8 @@
 <include>context/project_preamble.prompt</include>
 
 % Goal
+User story: As a team shipping under provider uncertainty, I want every model call to go through one environment-configured client, so that changing providers is a configuration edit, not a code change.
+
 Provide one fast completion entry point that returns primary or fallback model
 text when available and otherwise fails closed without exposing provider details.
 

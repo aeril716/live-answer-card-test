@@ -17,6 +17,8 @@
 <include>context/project_preamble.prompt</include>
 
 % Goal
+User story: As a sales rep on a live call, I want a prospect's question answered as a few glanceable keywords naming their source document, so that I can respond without leaving to check.
+
 Answer a prospect's technical question from the corpus as two or three large
 keywords a rep can glance at and say — and show nothing at all when the system
 is not confident, because a wrong card costs more than a blank one.

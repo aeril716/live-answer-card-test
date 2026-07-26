@@ -12,6 +12,8 @@
 </pdd-interface>
 
 % Goal
+User story: As a sales rep glancing sideways mid-sentence, I want at most three large keywords or a deliberately empty box, so that I can read the answer without breaking eye contact.
+
 Create the root-level `screen.py` terminal renderer for support cards.
 
 % Role & Scope

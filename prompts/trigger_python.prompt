@@ -17,6 +17,8 @@
 <include>context/project_preamble.prompt</include>
 
 % Goal
+User story: As a sales rep on a live call, I want the screen to answer real technical questions once and stay dark for everything else, so that a glance is always worth it.
+
 Provide a precision-first decision layer that shows cards only for eligible
 technical questions and fails closed whenever a safe decision cannot be made.
 
