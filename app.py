@@ -179,10 +179,12 @@ def _run_app():
     st.sidebar.markdown("[← Back to landing page](https://live-answer-card-landing.onrender.com)")
     if missing:
         st.sidebar.warning("Stubbed (not on main yet): " + ", ".join(missing))
-    # open the page with ?live=1 to boot straight into Live and auto-start
-    auto_live = str(st.query_params.get("live", "")) in ("1", "true")
+    # Live + auto-start is the default; open with ?typed=1 (or use the
+    # sidebar) for the typed-input fallback view
+    typed_default = str(st.query_params.get("typed", "")) in ("1", "true")
+    auto_live = not typed_default
     mode = st.sidebar.radio("Mode", ["Typed", "Live"],
-                            index=1 if auto_live else 0)
+                            index=0 if typed_default else 1)
     st.session_state.setdefault("running", False)
 
     if mode == "Typed":
