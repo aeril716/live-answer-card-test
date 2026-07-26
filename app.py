@@ -208,7 +208,7 @@ def _run_app():
         start_clicked = col_a.button("Start")
         if auto_live and not st.session_state.get("autostarted"):
             st.session_state.autostarted = True
-            start_clicked = True  # page opened with ?live=1: start immediately
+            start_clicked = True  # live is the default: start immediately
         if start_clicked:
             if getattr(mods["audio"], "USE_MOCK", False):
                 # replay the rehearsed mock call from the top on every Start

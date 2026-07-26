@@ -40,6 +40,6 @@ services:
         sync: false
       - key: FALLBACK_MODEL_API_KEY
         sync: false
-      # Optional audio key (Lane 2); the hosted app defaults to typed mode.
+      # Optional audio key (Lane 2); without it, Live mode replays a mock call.
       - key: ELEVENLABS_API_KEY
         sync: false
