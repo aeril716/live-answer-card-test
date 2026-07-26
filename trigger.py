@@ -147,6 +147,13 @@ def _rewrite(text):
         candidate = (keyed or questions)[-1]
     if not candidate:
         candidate = text.strip()
+    # trim chatter debris inside the sentence: start at the first
+    # question-opening word, and drop stutter fragments like "d- "
+    m = re.search(r"\b(how|what|whats|are|is|do|does|did|can|could|would|"
+                  r"will|when|where|who|why|which)\b", candidate, re.IGNORECASE)
+    if m and m.start() > 0:
+        candidate = candidate[m.start():]
+    candidate = re.sub(r"\b\w{1,3}-\s+", "", candidate)
     # a product named elsewhere in the utterance must reach retrieval
     low_all, low_seg = text.lower(), candidate.lower()
     missing = [p for p in _PRODUCTS if p in low_all and p not in low_seg]
