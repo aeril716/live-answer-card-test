@@ -1,0 +1,44 @@
+# The docs are searchable without ever mixing products
+
+## Story
+
+As the part of the system that has to answer questions,
+I want our product docs stored in a way that keeps each product's facts separate and ties every passage back to where it came from,
+so that every answer can name its source and we never attribute one product's fact to another.
+
+## What this is
+
+There are two jobs here.
+
+The first is a one-time preparation step: take the company's product docs and
+turn them into a searchable local store, then stop. It reports what it did for
+each file and doesn't run as part of a live call — the live system only ever
+reads what was already prepared. Preparing again is safe: if a usable store is
+already there, it can simply confirm that and leave it alone.
+
+The second is the search itself: given a question, hand back the handful of
+passages most relevant to it, best match first. Every passage carries its own
+text, a clear pointer to where it came from — which document and which section
+— and a sense of how close a match it is.
+
+The one mistake this must never make is blurring different products together.
+If one part of the docs says one product keeps its data for ninety days,
+another for seven, and another indefinitely, those have to stay three separate,
+distinguishable facts. Handing back the wrong product's number is the single
+failure this system cannot afford.
+
+## What "done" looks like
+
+- Every passage it returns names its source. It never hands back a passage with
+  no source — an answer that can't be traced is useless on a live call.
+- Results come back most-relevant-first.
+- Different products' facts stay distinguishable and are never merged into one
+  blended passage.
+- If a document is empty or unreadable, preparation quietly skips it, notes
+  which file it skipped, and carries on without crashing.
+- A blank or nonsensical question, or any internal trouble, simply comes back
+  with no results — an empty answer is a safe answer, never a crash.
+- For rehearsal and testing offline, there's a practice mode that returns canned
+  results without touching the store or the network.
+- Every search leaves one short, quiet note in the running log with the question
+  and how many passages came back.

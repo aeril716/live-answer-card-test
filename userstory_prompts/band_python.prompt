@@ -1,0 +1,45 @@
+# Every decision is recorded in a shared audit room
+
+## Story
+
+As a compliance reviewer opening the record after a call,
+I want every moment where the screen chose to answer or chose to stay silent captured in a shared audit room — including what was claimed and what backed it —
+so that the whole call is auditable afterward.
+
+## What this is
+
+This is an optional feature that's switched off by default. When it's turned
+on, every decision the system makes during a call — whether it lit up the
+screen or stayed dark, and why — gets written to a shared room as an audit
+record: the thing that was said, the decision, the reason for it, and, for the
+answers that did fire, how confident it was and which document backed it.
+Opened afterward, the room reads as a complete, in-order account of what the
+assistant surfaced during the call and why — the fired answers and the silent
+moments alike.
+
+The unbreakable rule: this must never slow the live call down. The entire
+promise of the product is answering within a few seconds, so a trip out to the
+network can never sit on the answer path. Recording is strictly
+fire-and-forget — decisions are dropped into an in-memory holding area and sent
+onward in the background. If the room is unreachable, slow, or failing, the
+call behaves exactly as if this feature didn't exist. If the holding area
+fills up, records are dropped rather than allowed to block the call or pile up
+without limit.
+
+## What "done" looks like
+
+- Off by default. With it off, nothing about this feature runs and the rest of
+  the system is completely unaffected — it isn't even along for the ride.
+- With it on, every decision — fired or silent — is recorded, with its reason,
+  and for the fired ones the confidence and the source. Handing a record off
+  never waits on the network.
+- If the room can't be reached, the call keeps making correct decisions the
+  whole time and never blocks or crashes. The feature's own failures are
+  quietly swallowed.
+- There's an option to leave the customer's actual words out of the room,
+  recording only the decision and the reason.
+- Turning it on must never measurably slow the call down. That speed guarantee
+  outranks how complete or how pretty the room looks — if it can't be met, the
+  feature is wrong no matter what.
+- None of this can be required for the rest of the system to work, and none of
+  the tests may depend on the room actually running.

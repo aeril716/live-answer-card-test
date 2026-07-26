@@ -1,0 +1,37 @@
+# One doorway for the fast thinking, configured by settings
+
+## Story
+
+As a team shipping while it's still unclear which AI provider we'll rely on,
+I want every request for a quick bit of AI text to go through one single place that's configured entirely by settings,
+so that switching providers later is a settings change and never a code change — and a slow or broken provider never stalls a live call.
+
+## What this is
+
+This is the one and only doorway the rest of the system uses whenever it needs
+a quick bit of AI text. Everything about which provider it talks to — which
+one, where, and with what credentials — comes from settings, never from the
+code itself. That way, when a provider gets rate-limited or we decide to swap
+to another, it's just an edit to configuration, with nothing in the code to
+touch.
+
+Because it sits right on the live-call path, speed and safety come first. It
+makes one quick attempt at the primary provider with a tight time limit. If
+that fails and a backup provider is fully set up, it makes one more quick
+attempt at the backup. The two attempts together stay inside a small, strict
+time budget. If everything fails — bad configuration, a timeout, a garbled
+response, anything — it simply comes back empty-handed rather than making the
+caller wait or throwing an error at them.
+
+## What "done" looks like
+
+- One quick primary attempt on a tight timeout, and at most one backup
+  attempt — and only when the backup is completely set up. A half-configured
+  backup is treated as no backup at all.
+- On any failure whatsoever, it returns nothing rather than raising. The caller
+  never has to catch an error from it.
+- It never leaks anything sensitive. The request text, the provider's address,
+  and the credentials never appear in the log. Each call leaves only a short,
+  safe note about how it went.
+- For rehearsal and testing offline, there's a practice mode that returns a
+  fixed canned response with no network access at all.

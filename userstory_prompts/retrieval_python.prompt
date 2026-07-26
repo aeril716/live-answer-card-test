@@ -1,0 +1,44 @@
+# The answer arrives as a few glanceable keywords
+
+## Story
+
+As a sales rep on a live call,
+when the prospect asks a technical question I want a couple of big, glanceable keywords that answer it and name which of our documents they came from,
+so that I can say the answer out loud without ever looking away from the customer — and I want nothing at all when the system isn't sure.
+
+## What this is
+
+When a technical question comes in, this piece looks through the company's
+product docs, finds the passage that best answers it, and boils that answer
+down to a couple of short, glanceable keywords — the kind you catch out of the
+corner of your eye and speak, not sentences you have to stop and read. The
+first keyword always carries the actual answer. It also always names the
+document the answer came from, so the rep can trust it and, if pushed, point to
+where it's written.
+
+Confidence is everything here. A blank screen costs the rep nothing; a
+confidently wrong keyword can cost them the deal. So it only shows a card when
+it's genuinely confident — our bar is being at least 60% sure. Anything below
+that shows nothing at all, which means out-of-scope questions and small talk
+naturally land on the empty screen.
+
+## What "done" looks like
+
+- At most three keywords, each one short and glanceable, with the first
+  carrying the answer.
+- The keywords are always grounded in the passage it actually found — never
+  invented. If it can't phrase good keywords from that passage, it falls back
+  to the passage's own section heading rather than making something up.
+- It always names the source document. It never shows keywords with no source
+  attached to them.
+- It only surfaces an answer when it's confident enough — at least 60% sure.
+  Below that, it shows nothing. An uncertain, shaky match should land below the
+  bar, not scrape just over it.
+- It never crashes. Any trouble at all simply means "show nothing."
+- The whole lookup stays comfortably inside the call's few-second budget, so
+  the answer is never late enough to be useless.
+- Every time it's asked, it leaves one short, quiet note in the running log
+  with the question and how confident it ended up being.
+- For rehearsal and testing offline, there's a practice mode with canned
+  answers: a SOC 2 question, a data-retention question, and a self-hosting
+  question each return their own fixed card, and anything else returns nothing.

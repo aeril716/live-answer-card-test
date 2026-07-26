@@ -1,0 +1,42 @@
+# The system keeps up with the live conversation
+
+## Story
+
+As someone helping on a live sales call,
+I want the system to follow the conversation as it happens and hand over each thing that's said one piece at a time,
+so that no question is ever missed and the same line is never seen twice.
+
+## What this is
+
+Picture a real call in progress — people talking back and forth. This piece is
+the system's ears. It keeps up with the live conversation and, whenever a
+complete spoken turn has landed, makes that turn available to the rest of the
+system, just once. It also notes, as best it can, who was speaking — the
+prospect, our own rep, or unknown when it genuinely can't tell — and roughly
+when in the call it happened.
+
+## What "done" looks like
+
+- Each complete spoken turn is handed over exactly once, in the order it was
+  said. The same line never comes through twice.
+- Only complete, settled turns count. A fragment that's still being spoken is
+  never passed along as if it were finished.
+- Asking "is there anything new?" is always instant. When nothing new has been
+  said yet, the honest answer is simply "nothing right now" — it must never
+  make the rest of the system stop and wait for it.
+- If the microphone or the connection to the listening service hiccups or
+  drops, the system quietly keeps trying to recover on its own. Through the
+  whole outage it just keeps answering "nothing right now." It never crashes
+  and never pushes the problem back onto whoever asked.
+- For rehearsal and testing without any live audio or network, there's a
+  practice mode that replays a fixed little script: first the prospect asking
+  whether we're SOC 2 certified, then a follow-up asking whether that's Type I
+  or Type II, then some weekend small talk, then a pricing question — in that
+  order, each one a moment later in the call than the last. Every line comes
+  through once; after the script runs out, it's "nothing right now" from then
+  on.
+- Every time it's asked for the next turn, it leaves one short, quiet note in
+  the running log about what came through.
+
+It should never crash, never make the caller wait, never repeat a line, and
+never pass along a half-finished fragment.
