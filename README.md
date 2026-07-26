@@ -66,7 +66,8 @@ Listed alphabetically.
 | **Erin** (`sohyunerinyang`) | Lane 2 — audio. Built `audio.py` with both the offline mock path and the ElevenLabs Scribe realtime transcription. Synced the demo screen recording to its audio track and prepared the anticipated audience Q&A for the presentation. |
 | **Jin Ha Park** | Lane 4 — screen & deploy. Built the `screen.py` render layer and the Render deployment that gated all three main prizes, created the mockup website, and produced the final demo and presentation deck. |
 | **Prashasti9** | Lane 1 — retrieval & ingestion. Owned `retrieval.py` and `ingest.py`, kicked off the PDD generation pipeline, and produced the video used on the mockup site. |
-| **Claude / PDD bots** | Agent-generated implementation — `app.py`, `ingest.py`, `retrieval.py`, `trigger.py`, and the test suite — from the prompts and PRD above. |
 
 > In a prompt-driven workflow, the specifications and corpus *are* the
-> engineering artifact; the generated code is their output.
+> engineering artifact; the generated code is their output. Implementation
+> code (`app.py`, `retrieval.py`, `ingest.py`, `trigger.py`, and the test
+> suite) was agent-generated from the prompts and specs above.
