@@ -199,7 +199,7 @@ def _run_app():
                 "This hosted demo replays a scripted call — a cloud server has "
                 "no microphone. For real audio, run it on your own laptop: "
                 "`scripts/run_local_live.sh`, then open "
-                "[localhost:8501](http://localhost:8501)."
+                "[localhost:8503](http://localhost:8503)."
             )
         hist = st.session_state.setdefault("history", [])
         col_a, col_b = st.sidebar.columns(2)

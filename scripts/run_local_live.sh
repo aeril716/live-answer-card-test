@@ -11,4 +11,4 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 python -m pip install -r requirements.txt
-AUDIO_USE_MOCK=false streamlit run app.py
+AUDIO_USE_MOCK=false streamlit run app.py --server.port 8503
