@@ -6,6 +6,9 @@
 
 MODULE
 
+User story: As a compliance reviewer after the call, I want every fire-or-stay-silent decision recorded in a shared room, so that what the rep claimed and what backed it is auditable.
+
+
 Write `band.py`. Every fire/no-fire decision made during a call is published
 to a Band room as an audit record, without adding any latency to the answer
 path. The trigger module already produces this data as per-utterance debug
