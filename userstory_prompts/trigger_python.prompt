@@ -1,0 +1,55 @@
+# The screen only lights up for a real question
+
+## Story
+
+As a sales rep on a live call,
+I want the second screen to light up only for a genuine technical question from the prospect and stay dark for everything else,
+so that a quick glance is always worth taking.
+
+## What this is
+
+This is the gatekeeper for the screen. Most of what's said on a call should
+never trigger anything — greetings, chit-chat about the weekend, the rep's own
+talking, plain statements, scheduling, and anything about pricing. The screen
+should only wake up when the prospect genuinely asks a technical question we
+could actually answer from our product docs.
+
+It leans deliberately toward staying quiet. When it isn't sure, it doesn't
+fire. A wrong card flashing up during small talk erodes the rep's trust in the
+screen far more than quietly missing the occasional question ever would. So
+whenever it's a close call, the answer is "stay dark."
+
+## What "done" looks like
+
+- It fires only for a real technical question coming from the prospect — even
+  if the prospect happens to be directing it at a colleague rather than the
+  rep. It never fires on the rep's own words.
+- Greetings, small talk, plain statements that aren't questions, and
+  back-channel noise ("mm-hmm," "right") never fire.
+- Pricing and scheduling never fire — those conversations belong to the rep,
+  not the screen.
+- Each question is answered only once per call. If essentially the same
+  question comes up again later in the same call, the screen stays dark the
+  second time. There's a clean way to start fresh for a new call, so the
+  "already asked" memory never carries over between calls.
+- The obvious cases — clearly not a question, clearly the rep talking, clearly
+  a repeat of something already asked — are dismissed instantly, without
+  spending any real effort thinking about them. Only the genuinely ambiguous
+  lines get the slower, more careful look.
+- It never crashes. If anything at all goes wrong while it's deciding, it
+  simply treats that as "stay dark."
+- Every decision leaves one short, quiet note in the running log — what was
+  said (shown safely, so nothing in the spoken words can garble or take over
+  the log) and whether it fired and why.
+- For rehearsal and testing, there's a practice mode with fixed, predictable
+  decisions that needs no outside help and no network.
+- Because spotting a repeat matters so much, there's an option to lean on a
+  shared memory to catch questions asked in slightly different words — but it
+  always keeps working, falling back to its own judgment, even when that shared
+  memory isn't available.
+
+There's a fixed set of example lines, each labelled with what should happen,
+kept as the accuracy yardstick. Running straight through them, it should get
+nearly all of them right — at least eighteen out of every twenty — and it must
+get every single small-talk, pricing, and scheduling line right by staying
+dark. Those are the ones that must never, ever fire.

@@ -1,0 +1,38 @@
+# What the rep sees is either a clean card or a clearly-empty box
+
+## Story
+
+As a sales rep glancing sideways in the middle of a sentence,
+I want to see at most three big keywords or a clearly-empty box — never a broken or half-drawn screen —
+so that I can read the answer without breaking eye contact with the customer.
+
+## What this is
+
+This is what the rep actually looks at. It takes a prepared answer and draws it
+as a clean, bordered box: up to three keywords in large capitals, one per line,
+with the source named underneath. But it only draws a real card when the answer
+is genuinely confident. When it isn't — or when there's no proper answer to
+show — it draws a deliberately empty box instead, so the rep can tell at a
+glance "nothing right now" rather than wonder whether the screen is broken.
+
+The empty state is a designed, intentional thing — a clean box with a single
+dash in it. It is never a blank space, never an error message, and never a
+half-finished card.
+
+## What "done" looks like
+
+- It draws a full card only when the answer clears the confidence bar — at
+  least 60% sure. Otherwise it draws the deliberate empty box.
+- At most the first three keywords, in capitals, one per line, with the source
+  named beneath them.
+- If the answer is incomplete, malformed, or contains anything that would
+  garble or deform the display, it quietly shows the empty box instead. It
+  never shows a broken or half-drawn card.
+- It never crashes. If it somehow can't finish drawing a card, it falls back to
+  the empty box.
+- Alongside whatever box it draws, it leaves one short status note saying
+  whether it drew a real card or the empty state.
+- It relies only on what's built in, makes no noise at all when it's first
+  loaded, and comes with a small self-contained demonstration that shows a full
+  card, a low-confidence answer, an empty input, and an answer with too many
+  keywords.
