@@ -1,76 +1,72 @@
-# live-answer-card-test
+# Live Answer Card
 
-## Terminal support screen
+A real-time assistant for live sales calls. When a prospect asks a technical
+question ("Are you SOC 2 certified?"), it retrieves a grounded answer from the
+company's docs and shows it on a second screen as two or three large keywords —
+in about three seconds, before the rep has to speak. When it isn't confident, it
+shows nothing on purpose: a wrong keyword is worse than a blank screen.
 
-`screen.py` provides `render(card)`, a dependency-free terminal preview of the
-support card. Complete cards with confidence at least `0.6` display up to three
-uppercase keywords and their source in a bordered box. Lower-confidence,
-incomplete, or malformed cards display a deliberate bordered `-` empty state.
+Built by four MSDS-AI students at a one-day hackathon.
 
-Run the four built-in examples with:
+## How this was built — Prompt-Driven Development (PDD)
 
-```sh
-python screen.py
-```
+The challenge was the *method*, not just the product. Under **PDD, prompts and
+issue specs are the source of truth and the Python is generated from them** — so
+the engineering work lives in the PRD, the interface contracts, the per-module
+specs, and the corpus, plus the integration that makes it run as one product.
+The `.py` files are the output of that work, not the work itself. Everything is
+mock-first: it runs offline, so the demo survives a dead mic or venue wifi.
 
-Each call also prints `[screen] in=conf=<confidence> out=<rendered|empty>` for
-the end-to-end demo trace. Streamlit rendering is intentionally out of scope for
-this version.
+## Modules
 
-## Mock audio input
+- **`screen.py`** — renders the support card: up to three large keywords and
+  their source. Below 0.6 confidence, or on a malformed card, it draws a
+  deliberate empty state instead — the silence is designed, not a failure.
+- **`audio.py`** — `get_utterance()` returns one committed utterance at a time.
+  A microphone-free mock path drives the loop offline; the live path streams
+  from ElevenLabs Scribe realtime and discards partial transcripts.
+- **`trigger.py`** — `should_fire()`, the decision layer and the heart of the
+  product. It rejects small talk, pricing, repeats, and non-questions, biased
+  toward precision: a missed card is safer than one firing mid-conversation.
+- **`retrieval.py` / `ingest.py`** — grounded keyword answers from the product
+  corpus via ChromaDB, each with a confidence score and a traceable source, so
+  every answer can be defended.
+- **`model_client.py`** — one provider-agnostic fast-model entry point. Returns
+  `""` on any timeout or error and retries once against a fallback provider, so
+  a single model going down never stops the demo.
 
-`audio.get_utterance()` provides deterministic, microphone-free input for the
-application loop. With `USE_MOCK = True`, successive calls return four
-hardcoded prospect utterances once each, in order, and then return:
+Every module runs offline with `USE_MOCK`, and returns its empty contract rather
+than raising.
 
-```python
-{"text": "", "speaker": "unknown", "ts": 0.0}
-```
+## Run it
 
-The mock performs no network or audio-device work. Run its six-call exhaustion
-demo with:
-
-```sh
-python audio.py
-```
-
-Each call prints `[audio] out=<text>`.
-
-## Decision layer
-
-`trigger.should_fire(utterance)` decides whether an utterance should produce a
-support card. It rejects rep speech, obvious non-questions, repeats, pricing,
-scheduling, and small talk before returning:
-
-```python
-{"fire": bool, "question": str, "reason": str}
-```
-
-The trigger is deliberately biased toward precision: a missed card is safer
-than an irrelevant card during small talk. Cheap checks run in the order
-question → repeat → domain/rewrite. Prospect and unknown-speaker utterances are
-classified by content; rep utterances never fire.
-
-Call `trigger.reset_call()` at the start of each sales call. A question is
-recorded when it fires, so it will not fire again during that call even if
-retrieval or display later fails. Local similarity matching is the default;
-optional mem0-backed matching is enabled by setting `USE_MEM0` to `1`, `true`,
-`yes`, or `on` (case-insensitive). Missing, blank, or unrecognized values
-default to `False`, so local memory remains the fail-safe.
-
-`model_client.fast_complete(prompt, max_tokens=200)` is the
-provider-independent fast-model entry point. It returns model text on success
-and `""` on every timeout or error. Configure the primary endpoint with
-`FAST_MODEL_*`. If every `FALLBACK_MODEL_*` value is set, a failed primary
-attempt is followed by one fallback attempt. Each attempt has a 200 ms timeout,
-SDK retries are disabled, and logs identify only the configured provider name.
-
-Copy `.env.example` to `.env`, fill in the provider settings, and run the
-offline tests:
+Live: **[live-answer-card.onrender.com](https://live-answer-card.onrender.com)** — opens straight into the scripted live call ·
+landing page: [live-answer-card-landing.onrender.com](https://live-answer-card-landing.onrender.com)
 
 ```sh
-pytest tests/test_model_client.py tests/test_trigger.py -q
+pip install -r requirements.txt
+python ingest.py            # build the corpus vector store (once)
+streamlit run app.py        # opens in Live mode and plays the mock call
+pytest -q                   # offline test suite
 ```
 
-The trigger test set runs without network access and requires at least 18/20
-correct classifications with zero small-talk fires.
+Real microphone mode (local only): put `ELEVENLABS_API_KEY` and
+`AUDIO_USE_MOCK=false` in `.env`, restart, and speak — the pipeline runs
+mic → realtime STT → trigger → retrieval → card inside the ~3-second pause.
+
+## Contributors & Roles
+
+Roles reflect ownership of the PDD work — the specs, the corpus, the lane
+implementations, and the integration that made the pieces run as one product.
+Listed alphabetically.
+
+| Contributor | Role & contribution |
+|---|---|
+| **Aeri** (`aeril716`) | Product & PDD lead. Authored the PRD, the frozen interface contracts, all six lane specs, the shared-context/guardrails, and the RAG corpus. Owned Lane 3 (trigger + model_client), integrated the lanes into `app.py`, and debugged across lanes. |
+| **Erin** (`sohyunerinyang`) | Lane 2 — audio. Built `audio.py` with both the offline mock path and the ElevenLabs Scribe realtime transcription. Synced the demo screen recording to its audio track and prepared the anticipated audience Q&A for the presentation. |
+| **Jin Ha Park** | Lane 4 — screen & deploy. Built the `screen.py` render layer and the Render deployment that gated all three main prizes, created the mockup website, and produced the final demo and presentation deck. |
+| **Prashasti9** | Lane 1 — retrieval & ingestion. Owned `retrieval.py` and `ingest.py`, kicked off the PDD generation pipeline, and produced the video used on the mockup site. |
+| **Claude / PDD bots** | Agent-generated implementation — `app.py`, `ingest.py`, `retrieval.py`, `trigger.py`, and the test suite — from the prompts and PRD above. |
+
+> In a prompt-driven workflow, the specifications and corpus *are* the
+> engineering artifact; the generated code is their output.
