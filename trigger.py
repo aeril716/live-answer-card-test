@@ -252,6 +252,11 @@ def should_fire(utterance: dict) -> dict:
             else:
                 result = data
                 _debug("domain/rewrite", result["reason"], text)
+            if result["fire"] and _is_repeat(result["question"]):
+                # crosstalk blobs differ in raw text but boil down to the
+                # same extracted question — catch the repeat post-rewrite
+                result = {"fire": False, "question": "", "reason": "repeat"}
+                _debug("repeat", "repeat_after_rewrite", text)
             if result["fire"]:
                 _remember(result["question"] or text)
     except Exception as e:

@@ -236,19 +236,27 @@ def _run_app():
                 time.sleep(0.1)
                 continue
             empties = 0
-            card = process_utterance(mods, u)
+            try:
+                decision = mods["trigger"].should_fire(u)
+                card = (mods["retrieval"].answer(decision.get("question", ""))
+                        if decision.get("fire") else None)
+            except Exception as e:
+                print(f"[app] loop error: {e}")
+                decision, card = {}, None
             fired = (card is not None
                      and card.get("confidence", 0.0) >= CONFIDENCE_THRESHOLD
                      and card.get("keywords"))
             if fired:
                 # only fired cards touch the screen: silence never erases the
-                # keywords, and non-triggering talk is never shown
+                # keywords, and non-triggering talk is never shown. The Q row
+                # shows the extracted question, not the raw transcript blob.
+                shown_q = (decision.get("question") or u.get("text", ""))[:160]
                 mods["screen"].render(card)
-                hist.append({"q": u.get("text", ""), "card": card})
+                hist.append({"q": shown_q, "card": card})
                 tabs = [(_scene_label(i, h), i == len(hist) - 1)
                         for i, h in enumerate(hist)]
                 placeholder.markdown(
-                    _card_markdown(card, u.get("text", ""), tabs),
+                    _card_markdown(card, shown_q, tabs),
                     unsafe_allow_html=True)
                 if mock_audio:
                     time.sleep(2.5)  # pace the replay so cards are watchable
